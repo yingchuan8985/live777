@@ -1,0 +1,65 @@
+@echo off
+echo ========================================
+echo Build Liveion Multi-Port UDP Bridge
+echo ========================================
+echo.
+
+REM Check Rust toolchain
+echo Checking Rust toolchain...
+rustc --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Error: Rust toolchain not detected
+    echo Please visit https://rustup.rs/ to install Rust
+    pause
+    exit /b 1
+)
+
+cargo --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Error: Cargo not detected
+    pause
+    exit /b 1
+)
+
+echo Rust toolchain check passed
+echo.
+
+echo Starting build...
+
+echo Cleaning previous build...
+cargo clean -p liveion-udp-bridge
+
+echo Building Release version...
+cargo build --release -p liveion-udp-bridge
+
+if %errorlevel% equ 0 (
+    echo.
+    echo ========================================
+    echo Build Successful!
+    echo ========================================
+    echo.
+    
+    if exist "target\release\liveion-udp-bridge.exe" (
+        echo Executable generated: target\release\liveion-udp-bridge.exe
+        dir "target\release\liveion-udp-bridge.exe"
+    )
+    
+    echo.
+    echo Usage:
+    echo 1. Configuration file: bridge_multiport.toml (default)
+    echo 2. Run program: target\release\liveion-udp-bridge.exe -v
+    echo 3. Or use startup scripts:
+    echo    - start_hardware_integration.bat (hardware integration)
+    echo    - start_multiport_routing_demo.bat (message routing demo)
+    
+) else (
+    echo.
+    echo ========================================
+    echo Build Failed!
+    echo ========================================
+    echo.
+    echo Please check the error messages above and fix the issues
+)
+
+echo.
+pause

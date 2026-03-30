@@ -15,6 +15,8 @@ use libwish::Client;
 
 use crate::forward::internal::PeerForwardInternal;
 use crate::forward::message::{ForwardInfo, Layer};
+use crate::forward::message_types::MessageType;
+
 use crate::result::Result;
 use crate::{AppError, constant};
 
@@ -24,6 +26,7 @@ use self::message::{CascadeInfo, ForwardEvent};
 mod internal;
 mod media;
 pub mod message;
+pub mod message_types;
 mod publish;
 pub mod rtcp;
 mod subscribe;
