@@ -1,7 +1,7 @@
 [http]
-listen = "0.0.0.0:9998"
+listen = "0.0.0.0:9999"
 cors = true
-public = "http://localhost:9998"
+public = "http://localhost:9999"
 
 [log]
 level = "debug"
