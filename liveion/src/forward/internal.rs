@@ -407,6 +407,16 @@ impl PeerForwardInternal {
     ) -> Result<()> {
         let sender = self.data_channel_forward.subscribe.clone();
         let receiver = self.data_channel_forward.publish.subscribe();
+        // DataChannel ↔ UDP 双向转发
+        // 网页 WHIP 发布者发来的消息进入 subscribe channel，所以订阅 subscribe
+        let dc_rx = self.data_channel_forward.subscribe.subscribe();
+        let dc_tx = self.data_channel_forward.publish.clone();
+        super::ptz_udp::spawn_ptz_udp(
+            dc_rx,
+            dc_tx,
+            super::ptz_udp::PtzUdpConfig::default(),
+        )
+        .await;
         Self::data_channel_forward(dc, sender, receiver).await;
         Ok(())
     }
