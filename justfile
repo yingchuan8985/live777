@@ -66,7 +66,7 @@ gst-rtsp-server-vp8:
 
 [group('gst-rtsp-server')]
 gst-rtsp-server-vp9:
-    ./test-rtsp-server "( videotestsrc is-live=true ! {{gst_hd}} ! {{gst_vp9}} ! rtpvp9pay name=pay0 pt=96 )"
+    ./test-rtsp-server "( videotestsrc is-live=true ! {{gst_hd}} ! {{gst_vp9}} ! vp9parse ! rtpvp9pay name=pay0 pt=96 )"
 
 [group('gst-rtsp-server')]
 gst-rtsp-server-av1:
@@ -88,6 +88,10 @@ gst-rtsp-server-both-h264-opus:
 whip-rtsp:
     cargo run --bin=whipinto -- -i rtsp://{{host}}:8554/test -w {{server}}/whip/{{stream}}
 
+[group('gst-rtsp-server')]
+whip-rtp:
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}}
+
 [group('simple-rtp')]
 ffmpeg-rtp-h264:
     cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
@@ -108,6 +112,21 @@ ffmpeg-rtp-vp8:
 ffmpeg-rtp-4k:
     cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re -f lavfi -i testsrc=size=3840x2160:rate=30 -strict experimental -vcodec {{vp9}} -f rtp rtp://{{host}}:5002 -sdp_file {{isdp}}"
+
+[group('simple-rtp')]
+ffmpeg-rtp-opus:
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
+        "ffmpeg -re {{asrc}} -acodec libopus -f rtp rtp://{{host}}:5002 -sdp_file {{isdp}}"
+
+[group('simple-rtp')]
+ffmpeg-rtp-g722:
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
+        "ffmpeg -re {{asrc}} -acodec g722 -f rtp rtp://{{host}}:5002?pkt_size=1200 -sdp_file {{isdp}}"
+
+[group('simple-rtp')]
+ffmpeg-rtp-vp8-opus:
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
+        "ffmpeg -re {{asrc}} {{vsrc}} -acodec libopus -vn -f rtp rtp://{{host}}:5002 -vcodec libvpx -an -f rtp rtp://{{host}}:5004 -sdp_file {{isdp}}"
 
 [group('simple-rtp')]
 ffplay-rtp:
