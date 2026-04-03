@@ -129,9 +129,9 @@ If `pkt_size > 1200` (most tool default `> 1200`, for example: `ffmpeg` default 
 
 But now, We support re-size `pkt_size` in `VP8` and `VP9`, You can use any `pkt_size` value in `VP8` and `VP9`
 
-Codec             | `AV1`  | `VP9`  | `VP8`  | `H264` | `OPUS` | `G722` |
------------------ | ------ | ------ | ------ | ------ | ------ | ------ |
-`pkt_size > 1200` | :shit: | :star: | :star: | :star: | :star: | :shit: |
+Codec             | `AV1`  | `VP9`  | `VP8`  | `H264` | `H265` | `OPUS` | `G722` |
+----------------- | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
+`pkt_size > 1200` | :shit: | :star: | :star: | :star: | :star: | :star: | :shit: |
 
 - :star: It's working
 - :shit: Don't support

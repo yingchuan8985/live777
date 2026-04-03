@@ -15,6 +15,14 @@ h264 := "libx264 -preset ultrafast -tune zerolatency -profile:v baseline -level 
 h265 := "libx265 -preset ultrafast -tune zerolatency -x265-params keyint=30:min-keyint=30:bframes=0:repeat-headers=1 -pix_fmt yuv420p -b:v 1000k -minrate 1000k -maxrate 1000k -bufsize 1000k"
 vp9  := "libvpx-vp9 -pix_fmt yuv420p"
 
+gst_hd := "video/x-raw,format=I420,width=1280,height=720,framerate=30/1"
+
+gst_x264 := "x264enc tune=zerolatency speed-preset=ultrafast key-int-max=60 byte-stream=true"
+gst_x265 := "x265enc tune=zerolatency speed-preset=ultrafast key-int-max=60 qp=23"
+gst_vp8 := "vp8enc deadline=1 cpu-used=6 lag-in-frames=0 end-usage=cbr keyframe-max-dist=60"
+gst_vp9 := "vp9enc deadline=1 cpu-used=6 lag-in-frames=0 end-usage=cbr keyframe-max-dist=60 row-mt=1"
+gst_av1 := "av1enc usage-profile=realtime"
+
 default:
     just --list
 
@@ -46,23 +54,23 @@ only-mpeg-rtp-h264:
 
 [group('gst-rtsp-server')]
 gst-rtsp-server-h264:
-    ./test-rtsp-server "( videotestsrc is-live=true ! x264enc ! rtph264pay name=pay0 pt=96 )"
+    ./test-rtsp-server "( videotestsrc is-live=true ! {{gst_hd}} ! {{gst_x264}} ! h264parse ! rtph264pay name=pay0 pt=96 )"
 
 [group('gst-rtsp-server')]
 gst-rtsp-server-h265:
-    ./test-rtsp-server "( videotestsrc is-live=true ! x265enc ! rtph265pay name=pay0 pt=96 )"
+    ./test-rtsp-server "( videotestsrc is-live=true ! {{gst_hd}} ! {{gst_x265}} ! h265parse ! rtph265pay name=pay0 pt=96 )"
 
 [group('gst-rtsp-server')]
 gst-rtsp-server-vp8:
-    ./test-rtsp-server "( videotestsrc is-live=true ! vp8enc ! rtpvp8pay name=pay0 pt=96 )"
+    ./test-rtsp-server "( videotestsrc is-live=true ! {{gst_hd}} ! {{gst_vp8}} ! rtpvp8pay name=pay0 pt=96 )"
 
 [group('gst-rtsp-server')]
 gst-rtsp-server-vp9:
-    ./test-rtsp-server "( videotestsrc is-live=true ! vp9enc ! rtpvp9pay name=pay0 pt=96 )"
+    ./test-rtsp-server "( videotestsrc is-live=true ! {{gst_hd}} ! {{gst_vp9}} ! rtpvp9pay name=pay0 pt=96 )"
 
 [group('gst-rtsp-server')]
 gst-rtsp-server-av1:
-    ./test-rtsp-server "( videotestsrc is-live=true ! av1enc usage-profile=realtime ! av1parse ! rtpav1pay name=pay0 pt=96 )"
+    ./test-rtsp-server "( videotestsrc is-live=true ! {{gst_hd}} ! {{gst_av1}} ! av1parse ! rtpav1pay name=pay0 pt=96 )"
 
 [group('gst-rtsp-server')]
 gst-rtsp-server-opus:
@@ -74,76 +82,76 @@ gst-rtsp-server-g722:
 
 [group('gst-rtsp-server')]
 gst-rtsp-server-both-h264-opus:
-    ./test-rtsp-server "( videotestsrc is-live=true ! x264enc ! rtph264pay name=pay0 pt=96 audiotestsrc is-live=true ! opusenc ! rtpopuspay name=pay1 pt=97 )"
+    ./test-rtsp-server "( videotestsrc is-live=true ! {{gst_x264}} ! rtph264pay name=pay0 pt=96 audiotestsrc is-live=true ! opusenc ! rtpopuspay name=pay1 pt=97 )"
 
 [group('gst-rtsp-server')]
 whip-rtsp:
     cargo run --bin=whipinto -- -i rtsp://{{host}}:8554/test -w {{server}}/whip/{{stream}}
 
 [group('simple-rtp')]
-mpeg-rtp-h264:
+ffmpeg-rtp-h264:
     cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{vsrc}} -vcodec {{h264}} -f rtp 'rtp://{{host}}:5002' -sdp_file {{isdp}}"
 
 [group('simple-rtp')]
-mpeg-rtp-h265:
+ffmpeg-rtp-h265:
     cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{vsrc}} -vcodec {{h265}} -f rtp 'rtp://{{host}}:5002' -sdp_file {{isdp}}"
 
 [group('simple-rtp')]
-mpeg-rtp-vp8:
+ffmpeg-rtp-vp8:
     cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{vsrc}} -vcodec libvpx -f rtp rtp://{{host}}:5002 -sdp_file {{isdp}}"
 
 # 4K (3840×2160)
 [group('simple-rtp')]
-mpeg-rtp-4k:
+ffmpeg-rtp-4k:
     cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re -f lavfi -i testsrc=size=3840x2160:rate=30 -strict experimental -vcodec {{vp9}} -f rtp rtp://{{host}}:5002 -sdp_file {{isdp}}"
 
 [group('simple-rtp')]
-play-rtp:
+ffplay-rtp:
     cargo run --bin=whepfrom -- -o "rtp://localhost?video=9000&audio=9002" --sdp-file {{osdp}} -w {{server}}/whep/{{stream}} --command \
         "ffplay -protocol_whitelist rtp,file,udp -i {{osdp}}"
 
 
 # Aa rtsp server receive stream
 [group('simple-rtsp')]
-mpeg-rtsp:
+ffmpeg-rtsp:
     cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{asrc}} {{vsrc}} -acodec libopus -vcodec libvpx -f rtsp rtsp://{{host}}:8550"
 
 [group('simple-rtsp')]
-mpeg-rtsp-tcp:
+ffmpeg-rtsp-tcp:
     cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{asrc}} {{vsrc}} -acodec libopus -vcodec libvpx -rtsp_transport tcp -f rtsp rtsp://{{host}}:8550"
 
 [group('simple-rtsp')]
-mpeg-rtsp-vp9:
+ffmpeg-rtsp-vp9:
     cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{asrc}} {{vsrc}} -acodec libopus -strict experimental -vcodec {{vp9}} -f rtsp rtsp://{{host}}:8550"
 
 [group('simple-rtsp')]
-mpeg-rtsp-h264:
+ffmpeg-rtsp-h264:
     cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{vsrc}} -vcodec {{h264}} -f rtsp rtsp://{{host}}:8550"
 
-mpeg-rtsp-h264-raw:
+ffmpeg-rtsp-h264-raw:
     cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{vsrc}} -vcodec libx264 -f rtsp rtsp://{{host}}:8550"
 
 [group('simple-rtsp')]
-mpeg-rtsp-h265:
+ffmpeg-rtsp-h265:
     cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{vsrc}} -vcodec {{h265}} -f rtsp rtsp://{{host}}:8550"
 
 [group('simple-rtsp')]
-play-rtsp:
+ffplay-rtsp:
     cargo run --bin=whepfrom -- -o rtsp-listen://{{host}}:8650 -w {{server}}/whep/{{stream}} --command \
         "ffplay rtsp://{{host}}:8650"
 
 [group('simple-rtsp')]
-play-rtsp-tcp:
+ffplay-rtsp-tcp:
     cargo run --bin=whepfrom -- -o rtsp-listen://{{host}}:8650 -w {{server}}/whep/{{stream}} --command \
         "ffplay rtsp://{{host}}:8650 -rtsp_transport tcp"
 
