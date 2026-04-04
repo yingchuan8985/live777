@@ -1,6 +1,6 @@
 # Must Lock image
-# trixie-20260223-slim use gstreamer 1.26.2
-FROM debian:trixie-20260223-slim AS common
+# trixie-slim use gstreamer 1.26.2
+FROM debian:trixie-slim AS common
 
 RUN apt update -y && apt install -y --no-install-recommends ca-certificates
 

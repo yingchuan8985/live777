@@ -1,4 +1,4 @@
-FROM debian:trixie-20251103 AS common
+FROM debian:trixie-slim AS common
 
 RUN apt update -y && apt install -y --no-install-recommends ca-certificates
 
