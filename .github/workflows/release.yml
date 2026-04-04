@@ -43,12 +43,12 @@ jobs:
       PKG_WHIPINTO_NAME: ""
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
 
       - uses: actions/setup-node@v6
         with:
