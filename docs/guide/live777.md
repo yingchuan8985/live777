@@ -21,9 +21,9 @@ Application          | `AV1`  | `VP9`  | `VP8`  | `H265` | `H264` | `OPUS` | `G7
 ------------------   | :----: | :----: | :----: | :----: | :----: | :----: | :----: |
 Browser `whip`       | :star: | :star: | :star: | :star: | :star: | :star: | :star: |
 Browser `whep`       | :star: | :star: | :star: | :star: | :star: | :star: | :star: |
-Gstreamer `whip`     | :tv: 1 | :star: | :star: | :star: | :star: | :star: | :star: |
+Gstreamer `whip`     | :star: | :star: | :star: | :star: | :star: | :star: | :star: |
 Gstreamer `whep`     | :tv: 2 | :star: | :star: | :star: | :star: | :star: | :star: |
-Gstreamer `whipinto` | :star: | :star: | :star: | :star: | :star: | :star: | :star: |
+Gstreamer `whipinto` | :tv: 1 | :star: | :star: | :star: | :star: | :tv: 1 | :star: |
 Gstreamer `whepfrom` | :tv: 2 | :star: | :star: | :star: | :star: | :star: | :star: |
 FFmpeg `whipinto`    | :shit: | :star: | :star: | :star: | :star: | :star: | :star: |
 FFmpeg `whepfrom`    | :shit: | :star: | :star: | :star: | :star: | :star: | :star: |

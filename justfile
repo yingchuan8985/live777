@@ -8,6 +8,9 @@ stream := "test-stream"
 isdp := "i.sdp"
 osdp := "o.sdp"
 
+irtp := "5002"
+ortp := "5006"
+
 asrc := "-f lavfi -i sine=frequency=1000"
 vsrc := "-f lavfi -i testsrc=size=640x480:rate=30"
 
@@ -52,6 +55,161 @@ run-cluster:
 only-mpeg-rtp-h264:
     ffmpeg -re {{vsrc}} -vcodec {{h264}} -f rtp 'rtp://{{host}}:5002?pkt_size=1200' -sdp_file {{isdp}}
 
+
+[group('gst-whip-rtp')]
+gst-whip-rtp-h264:
+    #!/usr/bin/env bash
+    cat > {{isdp}} << EOF
+    v=0
+    o=- 0 0 IN IP4 {{host}}
+    s=H264 Test Stream
+    c=IN IP4 {{host}}
+    t=0 0
+    m=video {{irtp}} RTP/AVP 96
+    a=rtpmap:96 H264/90000
+    EOF
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
+        "gst-launch-1.0 videotestsrc is-live=true ! {{gst_hd}} ! {{gst_x264}} ! h264parse ! rtph264pay ! udpsink host={{host}} port={{irtp}}"
+    rm {{isdp}}
+
+
+# TODO: whipinto has some WARN
+[group('gst-whip-rtp')]
+gst-whip-rtp-h265:
+    #!/usr/bin/env bash
+    cat > {{isdp}} << EOF
+    v=0
+    o=- 0 0 IN IP4 {{host}}
+    s=H265 Test Stream
+    c=IN IP4 {{host}}
+    t=0 0
+    m=video {{irtp}} RTP/AVP 96
+    a=rtpmap:96 H265/90000
+    EOF
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
+        "gst-launch-1.0 videotestsrc is-live=true ! {{gst_hd}} ! {{gst_x265}} ! h265parse config-interval=1 ! rtph265pay ! udpsink host={{host}} port={{irtp}}"
+    rm {{isdp}}
+
+[group('gst-whip-rtp')]
+gst-whip-rtp-vp8:
+    #!/usr/bin/env bash
+    cat > {{isdp}} << EOF
+    v=0
+    o=- 0 0 IN IP4 {{host}}
+    s=VP8 Test Stream
+    c=IN IP4 {{host}}
+    t=0 0
+    m=video {{irtp}} RTP/AVP 96
+    a=rtpmap:96 VP8/90000
+    EOF
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
+        "gst-launch-1.0 videotestsrc is-live=true ! {{gst_hd}} ! {{gst_vp8}} ! rtpvp8pay ! udpsink host={{host}} port={{irtp}}"
+    rm {{isdp}}
+
+[group('gst-whip-rtp')]
+gst-whip-rtp-vp9:
+    #!/usr/bin/env bash
+    cat > {{isdp}} << EOF
+    v=0
+    o=- 0 0 IN IP4 {{host}}
+    s=VP9 Test Stream
+    c=IN IP4 {{host}}
+    t=0 0
+    m=video {{irtp}} RTP/AVP 96
+    a=rtpmap:96 VP9/90000
+    EOF
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
+        "gst-launch-1.0 videotestsrc is-live=true ! {{gst_hd}} ! {{gst_vp9}} ! vp9parse ! rtpvp9pay ! udpsink host={{host}} port={{irtp}}"
+    rm {{isdp}}
+
+# TODO: webui can't player
+[group('gst-whip-rtp')]
+gst-whip-rtp-av1:
+    #!/usr/bin/env bash
+    cat > {{isdp}} << EOF
+    v=0
+    o=- 0 0 IN IP4 {{host}}
+    s=AV1 Test Stream
+    c=IN IP4 {{host}}
+    t=0 0
+    m=video {{irtp}} RTP/AVP 96
+    a=rtpmap:96 AV1/90000
+    EOF
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
+        "gst-launch-1.0 videotestsrc is-live=true ! {{gst_hd}} ! {{gst_av1}} ! av1parse ! rtpav1pay ! udpsink host={{host}} port={{irtp}}"
+    rm {{isdp}}
+
+# TODO: webui can't player
+[group('gst-whip-rtp')]
+gst-whip-rtp-opus:
+    #!/usr/bin/env bash
+    cat > {{isdp}} << EOF
+    v=0
+    o=- 0 0 IN IP4 {{host}}
+    s=OPUS Test Stream
+    c=IN IP4 {{host}}
+    t=0 0
+    m=audio {{irtp}} RTP/AVP 96
+    a=rtpmap:96 OPUS/48000/2
+    EOF
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
+        "gst-launch-1.0 audiotestsrc is-live=true ! opusenc ! opusparse ! rtpopuspay ! udpsink host={{host}} port={{irtp}}"
+    rm {{isdp}}
+
+[group('gst-whip-rtp')]
+gst-whip-rtp-g722:
+    #!/usr/bin/env bash
+    cat > {{isdp}} << EOF
+    v=0
+    o=- 0 0 IN IP4 {{host}}
+    s=G722 Test Stream
+    c=IN IP4 {{host}}
+    t=0 0
+    m=audio {{irtp}} RTP/AVP 96
+    a=rtpmap:96 G722/8000/1
+    EOF
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
+        "gst-launch-1.0 audiotestsrc is-live=true ! avenc_g722 ! rtpg722pay ! udpsink host={{host}} port={{irtp}}"
+    rm {{isdp}}
+
+[group('gst-whip-rtp')]
+gst-whip-rtp-h264-g722:
+    #!/usr/bin/env bash
+    cat > {{isdp}} << EOF
+    v=0
+    o=- 0 0 IN IP4 {{host}}
+    s=H264 + G722 Test Stream
+    c=IN IP4 {{host}}
+    t=0 0
+    m=video 5002 RTP/AVP 96
+    a=rtpmap:96 H264/90000
+    a=fmtp:96 packetization-mode=1
+    m=audio 5004 RTP/AVP 97
+    a=rtpmap:97 G722/8000
+    EOF
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
+        "gst-launch-1.0 videotestsrc is-live=true ! {{gst_hd}} ! {{gst_x264}} ! h264parse ! rtph264pay pt=96 ! udpsink host={{host}} port=5002 audiotestsrc is-live=true ! avenc_g722 ! rtpg722pay pt=97 ! udpsink host={{host}} port=5004"
+    rm {{isdp}}
+
+# TODO: only audio in webui can't player
+[group('gst-whip-rtp')]
+gst-whip-rtp-vp8-opus:
+    #!/usr/bin/env bash
+    cat > {{isdp}} << EOF
+    v=0
+    o=- 0 0 IN IP4 {{host}}
+    s=VP8 + OPUS Test Stream
+    c=IN IP4 {{host}}
+    t=0 0
+    m=video 5002 RTP/AVP 96
+    a=rtpmap:96 VP8/90000
+    m=audio 5004 RTP/AVP 97
+    a=rtpmap:97 OPUS/48000/2
+    EOF
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
+        "gst-launch-1.0 -v videotestsrc is-live=true ! {{gst_hd}} ! {{gst_vp8}} ! rtpvp8pay pt=96 ! udpsink host={{host}} port=5002 audiotestsrc is-live=true ! opusenc ! opusparse ! rtpopuspay pt=97 ! udpsink host={{host}} port=5004"
+    rm {{isdp}}
+
 [group('gst-rtsp-server')]
 gst-rtsp-server-h264:
     ./test-rtsp-server "( videotestsrc is-live=true ! {{gst_hd}} ! {{gst_x264}} ! h264parse ! rtph264pay name=pay0 pt=96 )"
@@ -74,7 +232,7 @@ gst-rtsp-server-av1:
 
 [group('gst-rtsp-server')]
 gst-rtsp-server-opus:
-    ./test-rtsp-server "( audiotestsrc is-live=true ! opusenc ! rtpopuspay name=pay0 pt=96 )"
+    ./test-rtsp-server "( audiotestsrc is-live=true ! opusenc ! opusparse ! rtpopuspay name=pay0 pt=96 )"
 
 [group('gst-rtsp-server')]
 gst-rtsp-server-g722:

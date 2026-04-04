@@ -431,3 +431,74 @@ a=rtpmap:96 G722/8000/1
 EOF
 ```
 
+## Both
+
+### H264+OPUS RTP
+
+```bash
+docker run --rm --network host \
+ghcr.io/binbat/gstreamer:latest \
+\
+gst-launch-1.0 videotestsrc is-live=true ! \
+video/x-raw,format=I420,width=1280,height=720,framerate=30/1 ! \
+x264enc tune=zerolatency speed-preset=ultrafast key-int-max=60 byte-stream=true ! \
+h264parse ! rtph264pay pt=96 ! udpsink host=127.0.0.1 port=5002 \
+audiotestsrc is-live=true ! \
+avenc_g722 ! rtpg722pay pt=97 ! udpsink host=127.0.0.1 port=5004
+```
+
+```bash
+cat > i.sdp << EOF
+v=0
+o=- 0 0 IN IP4 127.0.0.1
+s=H264 + G722 Test Stream
+c=IN IP4 127.0.0.1
+t=0 0
+m=video 5002 RTP/AVP 96
+a=rtpmap:96 H264/90000
+a=fmtp:96 packetization-mode=1
+m=audio 5004 RTP/AVP 97
+a=rtpmap:97 G722/8000
+EOF
+```
+
+```bash
+cargo run --bin=whipinto -- -i i.sdp -w http://localhost/whip/777
+```
+
+### VP8+OPUS RTP
+
+::: danger `TODO:`
+only audio in webui can't player
+:::
+
+```bash
+docker run --rm --network host \
+ghcr.io/binbat/gstreamer:latest \
+\
+gst-launch-1.0 videotestsrc is-live=true ! \
+video/x-raw,format=I420,width=1280,height=720,framerate=30/1 ! \
+vp8enc deadline=1 cpu-used=6 lag-in-frames=0 end-usage=cbr keyframe-max-dist=60 ! \
+rtpvp8pay pt=96 ! udpsink host=127.0.0.1 port=5002 \
+audiotestsrc is-live=true ! opusenc ! opusparse ! \
+rtpopuspay pt=97 ! udpsink host=127.0.0.1 port=5004
+```
+
+```bash
+cat > i.sdp << EOF
+v=0
+o=- 0 0 IN IP4 127.0.0.1
+s=VP8 + OPUS Test Stream
+c=IN IP4 127.0.0.1
+t=0 0
+m=video 5002 RTP/AVP 96
+a=rtpmap:96 VP8/90000
+m=audio 5004 RTP/AVP 97
+a=rtpmap:97 OPUS/48000/2
+EOF
+```
+
+```bash
+cargo run --bin=whipinto -- -i i.sdp -w http://localhost/whip/777
+```
+
