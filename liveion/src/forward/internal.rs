@@ -29,6 +29,7 @@ use webrtc::track::track_local::track_local_static_rtp::TrackLocalStaticRTP;
 use webrtc::track::track_remote::TrackRemote;
 
 use crate::AppError;
+use crate::config::PtzUdp;
 use crate::forward::get_peer_id;
 use crate::forward::message::ForwardInfo;
 use crate::forward::rtcp::RtcpMessage;
@@ -62,10 +63,11 @@ pub(crate) struct PeerForwardInternal {
     data_channel_forward: DataChannelForward,
     ice_server: Vec<RTCIceServer>,
     event_sender: broadcast::Sender<ForwardEvent>,
+    ptz_udp: PtzUdp,
 }
 
 impl PeerForwardInternal {
-    pub(crate) fn new(stream: impl ToString, ice_server: Vec<RTCIceServer>) -> Self {
+    pub(crate) fn new(stream: impl ToString, ice_server: Vec<RTCIceServer>, ptz_udp: PtzUdp) -> Self {
         PeerForwardInternal {
             stream: stream.to_string(),
             create_at: Utc::now().timestamp_millis(),
@@ -82,6 +84,7 @@ impl PeerForwardInternal {
             },
             ice_server,
             event_sender: new_broadcast_channel!(16),
+            ptz_udp,
         }
     }
 
@@ -407,14 +410,16 @@ impl PeerForwardInternal {
     ) -> Result<()> {
         let sender = self.data_channel_forward.subscribe.clone();
         let receiver = self.data_channel_forward.publish.subscribe();
-        // DataChannel ↔ UDP 双向转发
-        // 网页 WHIP 发布者发来的消息进入 subscribe channel，所以订阅 subscribe
+        // DataChannel ↔ UDP bidirectional forwarding.
+        // Messages from the WHIP publisher arrive on the subscribe channel.
         let dc_rx = self.data_channel_forward.subscribe.subscribe();
         let dc_tx = self.data_channel_forward.publish.clone();
+        let stream_cfg = self.ptz_udp.streams.get(&self.stream).cloned();
         super::ptz_udp::spawn_ptz_udp(
+            self.stream.clone(),
             dc_rx,
             dc_tx,
-            super::ptz_udp::PtzUdpConfig::default(),
+            stream_cfg,
         )
         .await;
         Self::data_channel_forward(dc, sender, receiver).await;

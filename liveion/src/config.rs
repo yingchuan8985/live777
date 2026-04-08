@@ -26,6 +26,9 @@ pub struct Config {
     #[serde(default)]
     pub webhook: Webhook,
 
+    #[serde(default)]
+    pub ptz_udp: PtzUdp,
+
     #[cfg(feature = "recorder")]
     #[serde(default)]
     pub recorder: RecorderConfig,
@@ -106,6 +109,33 @@ impl Default for Log {
         }
     }
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PtzUdp {
+    /// Per-stream UDP port configuration, keyed by stream name.
+    #[serde(default)]
+    pub streams: std::collections::HashMap<String, PtzUdpStream>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PtzUdpStream {
+    /// Target port for all control messages (downstream parses message_type)
+    pub udp_port: u16,
+    /// UDP inbound listen port for replies from downstream
+    pub listen_port: u16,
+    /// Target host, default "127.0.0.1"
+    #[serde(default = "default_target_host")]
+    pub target_host: String,
+}
+
+fn default_target_host() -> String { "127.0.0.1".to_string() }
+
+impl Default for PtzUdp {
+    fn default() -> Self {
+        Self { streams: std::collections::HashMap::new() }
+    }
+}
+
 
 fn default_log_level() -> String {
     env::var("LOG_LEVEL").unwrap_or_else(|_| {

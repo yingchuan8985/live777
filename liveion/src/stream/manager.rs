@@ -210,7 +210,7 @@ impl Manager {
     }
 
     async fn do_stream_create(&self, stream: String) -> PeerForward {
-        let forward = PeerForward::new(stream.clone(), self.config.ice_servers.clone());
+        let forward = PeerForward::new(stream.clone(), self.config.ice_servers.clone(), self.config.ptz_udp.clone());
         let subscribe_event = forward.subscribe_event();
         tokio::spawn(Self::forward_event_handler(
             subscribe_event,
