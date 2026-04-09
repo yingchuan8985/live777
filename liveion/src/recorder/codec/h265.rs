@@ -6,7 +6,7 @@ use anyhow::{Result, anyhow};
 use bytes::{Bytes, BytesMut};
 use scuffle_h265::{
     ConstantFrameRate, HEVCDecoderConfigurationRecord, NALUnitType, NumTemporalLayers,
-    ParallelismType, SpsNALUnit,
+    ParallelismType, ProfileAdditionalFlags, SpsNALUnit,
 };
 use webrtc::rtp::codecs::h265::{H265Packet, H265Payload};
 use webrtc::rtp::packet::Packet;
@@ -51,6 +51,104 @@ impl H265Adapter {
         }
     }
 
+    /// Build an RFC-compliant HEVC codec string from parsed SPS data.
+    ///
+    /// Format: `hev1.<profile_space><profile_idc>.<compat_flags>.<tier><level>.<constraint_flags>`
+    /// per ISO/IEC 14496-15 Annex E.
+    fn build_codec_string(sps: &[u8]) -> Option<String> {
+        let parsed = SpsNALUnit::parse(Cursor::new(sps)).ok()?;
+        let p = &parsed.rbsp.profile_tier_level.general_profile;
+
+        let profile_space = match p.profile_space {
+            1 => "A",
+            2 => "B",
+            3 => "C",
+            _ => "",
+        };
+        let compat = format!("{:08X}", p.profile_compatibility_flag.bits());
+        let tier = if p.tier_flag { "H" } else { "L" };
+        let level = p.level_idc.unwrap_or(0);
+
+        // Reconstruct the 48-bit general_constraint_indicator_flags from parsed fields.
+        // Bit 47 is the MSB (progressive_source_flag).
+        let mut constraint: u64 = 0;
+        if p.progressive_source_flag {
+            constraint |= 1u64 << 47;
+        }
+        if p.interlaced_source_flag {
+            constraint |= 1u64 << 46;
+        }
+        if p.non_packed_constraint_flag {
+            constraint |= 1u64 << 45;
+        }
+        if p.frame_only_constraint_flag {
+            constraint |= 1u64 << 44;
+        }
+        match &p.additional_flags {
+            ProfileAdditionalFlags::Full {
+                max_12bit_constraint_flag,
+                max_10bit_constraint_flag,
+                max_8bit_constraint_flag,
+                max_422chroma_constraint_flag,
+                max_420chroma_constraint_flag,
+                max_monochrome_constraint_flag,
+                intra_constraint_flag,
+                one_picture_only_constraint_flag,
+                lower_bit_rate_constraint_flag,
+                max_14bit_constraint_flag,
+            } => {
+                if *max_12bit_constraint_flag {
+                    constraint |= 1u64 << 43;
+                }
+                if *max_10bit_constraint_flag {
+                    constraint |= 1u64 << 42;
+                }
+                if *max_8bit_constraint_flag {
+                    constraint |= 1u64 << 41;
+                }
+                if *max_422chroma_constraint_flag {
+                    constraint |= 1u64 << 40;
+                }
+                if *max_420chroma_constraint_flag {
+                    constraint |= 1u64 << 39;
+                }
+                if *max_monochrome_constraint_flag {
+                    constraint |= 1u64 << 38;
+                }
+                if *intra_constraint_flag {
+                    constraint |= 1u64 << 37;
+                }
+                if *one_picture_only_constraint_flag {
+                    constraint |= 1u64 << 36;
+                }
+                if *lower_bit_rate_constraint_flag {
+                    constraint |= 1u64 << 35;
+                }
+                if matches!(max_14bit_constraint_flag, Some(true)) {
+                    constraint |= 1u64 << 34;
+                }
+            }
+            ProfileAdditionalFlags::Main10Profile {
+                one_picture_only_constraint_flag,
+            } => {
+                if *one_picture_only_constraint_flag {
+                    constraint |= 1u64 << 36;
+                }
+            }
+            ProfileAdditionalFlags::None => {}
+        }
+
+        // Format as 12 uppercase hex digits (= 6 bytes), strip trailing zero bytes.
+        let hex = format!("{:012X}", constraint);
+        let trimmed = hex.trim_end_matches("00");
+        let constraint_str = if trimmed.is_empty() { "00" } else { trimmed };
+
+        Some(format!(
+            "hev1.{}{}.{}.{}{}.{}",
+            profile_space, p.profile_idc, compat, tier, level, constraint_str,
+        ))
+    }
+
     fn update_codec_info(&mut self) {
         if let Some(ref sps) = self.sps
             && let Ok(parsed) = SpsNALUnit::parse(Cursor::new(sps))
@@ -58,7 +156,8 @@ impl H265Adapter {
             self.width = parsed.rbsp.cropped_width() as u32;
             self.height = parsed.rbsp.cropped_height() as u32;
             if self.codec_string.is_none() {
-                self.codec_string = Some("hev1".to_string());
+                self.codec_string =
+                    Self::build_codec_string(sps).or_else(|| Some("hev1".to_string()));
             }
         }
     }

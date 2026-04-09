@@ -1,6 +1,6 @@
 # Recorder
 
-The Recorder in liveion is an optional feature that automatically records live streams into MP4 fragments and saves them locally or to the cloud. The `recorder` feature must be enabled at compile time.
+The Recorder in liveion is an optional feature that automatically records live streams into MP4 fragments and saves them to storage. The `recorder` feature must be enabled at compile time.
 
 ## Supported Codecs {#codec}
 
@@ -46,10 +46,10 @@ max_recording_seconds = 86_400
 # Optional: Node alias for multi-node deployments
 node_alias = "live777-node-001"
 
-# Storage backend configuration
+# Storage backend configuration (default: local filesystem)
 [recorder.storage]
-type = "fs"          # Storage type: "fs", "s3", or "oss"
-root = "./storage"   # Root path for recordings (default: "./storage")
+type = "fs"
+root = "./storage"
 ```
 
 ### Configuration Options
@@ -62,14 +62,18 @@ root = "./storage"   # Root path for recordings (default: "./storage")
 
 #### Storage Options
 
-**File System (fs):**
+**Filesystem Backend (default):**
 
-- `type`: Must be `"fs"`
-- `root`: Root directory path (default: `"./storage"`)
+- `type`: `"fs"`
+- `root`: Root directory for storing recordings (default: `"./storage"`)
+
+::: warning
+The filesystem backend supports basic recording only. The [async upload queue](#async-upload) feature requires S3.
+:::
 
 **S3 Backend:**
 
-- `type`: Must be `"s3"`
+- `type`: `"s3"`
 - `bucket`: S3 bucket name (required)
 - `root`: Root path within bucket (default: `"/"`)
 - `region`: AWS region (optional, auto-detected from environment if not set)
@@ -80,26 +84,19 @@ root = "./storage"   # Root path for recordings (default: "./storage")
 - `disable_config_load`: Set to `true` to disable automatic credential loading from environment/config files (default: `false`)
 - `enable_virtual_host_style`: Enable virtual-hosted-style requests, e.g., `bucket.endpoint.com` instead of `endpoint.com/bucket` (default: `false`)
 
-**OSS Backend:**
+## Storage Backend {#storage}
 
-- `type`: Must be `"oss"`
-- `bucket`: OSS bucket name (required)
-- `root`: Root path within bucket (default: `"/"`)
-- `region`: OSS region identifier, e.g., `"oss-cn-hangzhou"` (required)
-- `endpoint`: OSS endpoint URL, e.g., `"https://oss-cn-hangzhou.aliyuncs.com"` (required)
-- `access_key_id`: Alibaba Cloud access key ID (optional, can be loaded from environment)
-- `access_key_secret`: Alibaba Cloud access key secret (optional, can be loaded from environment)
-- `security_token`: Security token for STS temporary credentials (optional)
-
-## Storage Backends {#storage}
-
-### Local File System
+### Local Filesystem (default)
 
 ```toml
 [recorder.storage]
 type = "fs"
-root = "./storage"  # Or absolute path like "/var/lib/live777/recordings"
+root = "./storage"
 ```
+
+::: info
+The filesystem backend supports basic recording (write segments, update MPD). It does not support presigned URLs or the async upload queue.
+:::
 
 ### AWS S3
 
@@ -149,31 +146,6 @@ secret_access_key = "minioadmin"
 enable_virtual_host_style = false
 ```
 
-### Alibaba Cloud OSS
-
-```toml
-[recorder.storage]
-type = "oss"
-bucket = "my-oss-bucket"
-root = "/recordings"
-region = "oss-cn-hangzhou"
-endpoint = "https://oss-cn-hangzhou.aliyuncs.com"
-access_key_id = "your-access-key"
-access_key_secret = "your-access-secret"
-```
-
-For STS temporary credentials:
-```toml
-[recorder.storage]
-type = "oss"
-bucket = "my-oss-bucket"
-root = "/recordings"
-region = "oss-cn-hangzhou"
-endpoint = "https://oss-cn-hangzhou.aliyuncs.com"
-access_key_id = "STS..."
-access_key_secret = "..."
-security_token = "..."
-```
 
 ## Start/Status API {#api}
 
@@ -186,19 +158,28 @@ Requires `recorder` feature.
   - Response: `{ "recording": true }`
 - Stop recording: `DELETE` `/api/record/:streamId`
 
+### Recording Index Sync APIs
+
+- Pull sessions: `GET` `/api/recordings`
+  - Query: `?stream=optional&since_ts=0&limit=200`
+- ACK sessions: `PATCH` `/api/recordings`
+  - Body: `{ "records": [{ "stream": "s", "record": "id" }] }`
+- Delete ACKed sessions: `DELETE` `/api/recordings`
+  - Body: `{ "records": [{ "stream": "s", "record": "id" }] }`
+
 ## MPD Path Conventions {#mpd}
 
 - Default `record_dir` (when `base_dir` is not provided): `/:streamId/:record_id/` where `record_id` is a 10-digit Unix timestamp (seconds).
 - Default MPD location: `/{record_dir}/manifest.mpd`.
 - When the cumulative duration for a session reaches `max_recording_seconds`, the recorder closes the current fragments and starts a new timestamped directory (for example `/:streamId/1718200000/`). No calendar-style paths are produced automatically.
-- When `base_dir` is provided, `record_dir` matches that value exactly and the manifest lives at `/{record_dir}/manifest.mpd`. If the override does not end with a 10-digit Unix timestamp, the returned `record_id` is an empty string.
+- When `base_dir` is provided, `record_dir` matches that value exactly and the manifest lives at `/{base_dir}/manifest.mpd`. If the override does not end with a 10-digit Unix timestamp, the returned `record_id` is an empty string.
 
 ## File Structure {#file-structure}
 
 Recorded files are organized by `record_dir`:
 
 ```
-records/
+storage/
 └── stream1/
     └── 1762842203/
         ├── manifest.mpd
@@ -210,3 +191,23 @@ records/
 ```
 
 - Timestamp-based folders (`stream/1762842203`) are the canonical layout produced by Live777, including automatic rotations triggered by `max_recording_seconds`. Provide a custom `base_dir` only if you intentionally need a different structure and accept the impact on `record_id` values.
+
+## Async Upload (Presigned URLs) {#async-upload}
+
+::: warning
+Async upload requires S3 storage. It is not supported with the filesystem backend.
+:::
+
+Enable async uploads via Liveman presign API and local spool:
+
+```toml
+[recorder.upload]
+enabled = true
+liveman_url = "http://127.0.0.1:8888"
+liveman_token = "live777"
+queue_path = "./recordings/upload_queue.jsonl"
+local_dir = "./recordings"
+presign_ttl_seconds = 300
+interval_ms = 2000
+concurrency = 2
+```

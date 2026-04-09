@@ -1,11 +1,11 @@
-FROM debian:trixie-20251103 AS common
+FROM debian:trixie-slim AS common
 
 RUN apt update -y && apt install -y --no-install-recommends ca-certificates
 
 RUN apt install -y --no-install-recommends libaom3 librav1e0.7 libsvtav1enc2 libvpx9 libx264-164 libx265-215 libopus0
 
 FROM common AS builder
-ENV FFMPEG_VER=8.0
+ENV FFMPEG_VER=8.1
 
 RUN apt install -y --no-install-recommends build-essential pkg-config
 

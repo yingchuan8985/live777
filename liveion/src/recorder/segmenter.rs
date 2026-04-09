@@ -36,6 +36,8 @@ pub struct Segmenter {
     op: Operator,
     stream: String,
     path_prefix: String,
+    uploader: Option<std::sync::Arc<crate::recorder::uploader::UploadManager>>,
+    local_dir: Option<std::path::PathBuf>,
     timescale: u32,
     // Length of each segment (in timescale units) for fast comparison
     seg_duration_ticks: u64,
@@ -107,11 +109,19 @@ pub struct Segmenter {
 }
 
 impl Segmenter {
-    pub async fn new(op: Operator, stream: String, root_prefix: String) -> Result<Self> {
+    pub async fn new(
+        op: Operator,
+        stream: String,
+        root_prefix: String,
+        uploader: Option<std::sync::Arc<crate::recorder::uploader::UploadManager>>,
+        local_dir: Option<String>,
+    ) -> Result<Self> {
         Ok(Self {
             op,
             stream: stream.clone(),
             path_prefix: root_prefix,
+            uploader,
+            local_dir: local_dir.map(std::path::PathBuf::from),
             timescale: 90_000,
             seg_duration_ticks: 90_000u64 * DEFAULT_SEG_DURATION,
             video_seg_index: 0,
@@ -831,29 +841,65 @@ impl Segmenter {
             self.stream
         );
 
-        // Clone what we need for the background task.
-        let op_clone = self.op.clone();
-        let stream_clone = self.stream.clone();
-        let path_clone = path.clone();
+        if let Some(uploader) = self.uploader.as_ref()
+            && let Some(local_dir) = self.local_dir.as_ref()
+        {
+            let local_path = local_dir.join(&path);
+            let uploader = uploader.clone();
+            let stream_clone = self.stream.clone();
+            let path_clone = path.clone();
+            tokio::spawn(async move {
+                if let Some(parent) = local_path.parent()
+                    && let Err(e) = tokio::fs::create_dir_all(parent).await
+                {
+                    tracing::warn!(
+                        "[segmenter] failed to create local dir for {}: {}",
+                        path_clone,
+                        e
+                    );
+                    return;
+                }
+                if let Err(e) = tokio::fs::write(&local_path, data).await {
+                    tracing::warn!(
+                        "[segmenter] failed to write local file {} (stream {}): {}",
+                        path_clone,
+                        stream_clone,
+                        e
+                    );
+                    return;
+                }
+                if let Err(e) = uploader
+                    .enqueue(path_clone.clone(), local_path.to_string_lossy().to_string())
+                    .await
+                {
+                    tracing::warn!("[segmenter] failed to enqueue upload {}: {}", path_clone, e);
+                }
+            });
+        } else {
+            // Clone what we need for the background task.
+            let op_clone = self.op.clone();
+            let stream_clone = self.stream.clone();
+            let path_clone = path.clone();
 
-        // Spawn the actual write in a detached task so that slow/object‐storage latency does
-        // not block the real‐time RTP processing loop. Any error will be logged.
-        tokio::spawn(async move {
-            if let Err(e) = op_clone.write(&path_clone, data).await {
-                tracing::warn!(
-                    "[segmenter] failed to write file {} (stream {}): {}",
-                    path_clone,
-                    stream_clone,
-                    e
-                );
-            } else {
-                tracing::debug!(
-                    "[segmenter] successfully stored file {} for stream {}",
-                    path_clone,
-                    stream_clone
-                );
-            }
-        });
+            // Spawn the actual write in a detached task so that slow/object‐storage latency does
+            // not block the real‐time RTP processing loop. Any error will be logged.
+            tokio::spawn(async move {
+                if let Err(e) = op_clone.write(&path_clone, data).await {
+                    tracing::warn!(
+                        "[segmenter] failed to write file {} (stream {}): {}",
+                        path_clone,
+                        stream_clone,
+                        e
+                    );
+                } else {
+                    tracing::debug!(
+                        "[segmenter] successfully stored file {} for stream {}",
+                        path_clone,
+                        stream_clone
+                    );
+                }
+            });
+        }
 
         // Return immediately. The caller does not need to wait for persistence; worst-case we
         // lose one fragment, which is acceptable for live streaming.

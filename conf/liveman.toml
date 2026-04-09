@@ -107,19 +107,17 @@ connect_timeout = 30
 [recorder]
 
 [recorder.storage]
-# Storage type: "fs" for local filesystem; also supports "oss" (Alibaba Cloud OSS) and "s3"
+# Local filesystem (default). Note: presign endpoint requires S3.
 type = "fs"
-# Root path for local filesystem
-root = "./records"
+root = "./storage"
 
-# Example: Alibaba Cloud OSS storage
-# type = "oss"
-# bucket = "my-oss-bucket"
+# AWS S3 with explicit credentials
+# type = "s3"
+# bucket = "my-live777-bucket"
 # root = "/recordings"
-# region = "oss-cn-hangzhou"
-# endpoint = "https://oss-cn-hangzhou.aliyuncs.com"
+# region = "us-east-1"
 # access_key_id = "your-access-key"
-# access_key_secret = "your-access-secret"
+# secret_access_key = "your-access-secret"
 
 # Liveman auto recording configuration (manager-driven)
 [auto_record]

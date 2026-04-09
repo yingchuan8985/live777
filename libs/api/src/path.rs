@@ -45,3 +45,11 @@ pub fn record(stream: &str) -> String {
 pub fn recordings() -> &'static str {
     "/api/recordings"
 }
+
+pub fn recordings_ack() -> &'static str {
+    "/api/recordings"
+}
+
+pub fn recordings_delete() -> &'static str {
+    "/api/recordings"
+}

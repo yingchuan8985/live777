@@ -14,8 +14,8 @@ use storage::init_operator;
 use crate::hook::{Event, StreamEventType};
 use crate::stream::manager::Manager;
 use api::recorder::{
-    AckRecordingsRequest, AckRecordingsResponse, PullRecordingsRequest, PullRecordingsResponse,
-    RecordingStatus,
+    AckRecordingsRequest, AckRecordingsResponse, DeleteRecordingsRequest, DeleteRecordingsResponse,
+    PullRecordingsRequest, PullRecordingsResponse, RecordingStatus,
 };
 use chrono::Utc;
 
@@ -26,10 +26,12 @@ mod index;
 mod pli_backoff;
 mod segmenter;
 mod task;
+mod uploader;
 use task::RecordingTask;
 pub mod codec;
 mod fmp4;
 use index::{RecordingIndexEntry, RecordingsIndex};
+use uploader::UploadManager;
 
 static TASKS: Lazy<RwLock<HashMap<String, RecordingTask>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
@@ -37,6 +39,7 @@ static TASKS: Lazy<RwLock<HashMap<String, RecordingTask>>> =
 static STORAGE: Lazy<RwLock<Option<Operator>>> = Lazy::new(|| RwLock::new(None));
 static INDEX: Lazy<RwLock<Option<Arc<RecordingsIndex>>>> = Lazy::new(|| RwLock::new(None));
 static NODE_ALIAS: Lazy<RwLock<Option<String>>> = Lazy::new(|| RwLock::new(None));
+static UPLOADER: Lazy<RwLock<Option<Arc<UploadManager>>>> = Lazy::new(|| RwLock::new(None));
 
 #[derive(Clone, Debug)]
 pub struct RecordingInfo {
@@ -88,6 +91,27 @@ pub async fn init(manager: Arc<Manager>, cfg: RecorderConfig) {
                 }
                 Err(e) => {
                     tracing::error!("[recorder] failed to load index.json: {}", e);
+                }
+            }
+        }
+    }
+
+    if cfg.upload.enabled {
+        if cfg.upload.liveman_url.trim().is_empty() {
+            tracing::warn!("[recorder] upload enabled but liveman_url is empty");
+        } else {
+            let mut uploader_guard = UPLOADER.write().await;
+            if uploader_guard.is_none() {
+                match UploadManager::load(cfg.upload.clone()).await {
+                    Ok(manager) => {
+                        let manager = Arc::new(manager);
+                        tokio::spawn(manager.clone().run());
+                        *uploader_guard = Some(manager);
+                        tracing::info!("[recorder] uploader initialized");
+                    }
+                    Err(e) => {
+                        tracing::error!("[recorder] failed to init uploader: {}", e);
+                    }
                 }
             }
         }
@@ -150,7 +174,9 @@ pub async fn start(
         tracing::info!("[recorder] stream {} is already recording", stream);
         return Ok(existing.info.clone());
     }
-    let task = RecordingTask::spawn(manager, &stream, base_dir).await?;
+    let uploader = { UPLOADER.read().await.clone() };
+    let local_dir = uploader.as_ref().map(|u| u.local_dir());
+    let task = RecordingTask::spawn(manager, &stream, base_dir, uploader, local_dir).await?;
     let info = task.info.clone();
     map.insert(stream.clone(), task);
 
@@ -268,11 +294,22 @@ pub async fn pull_recordings(req: PullRecordingsRequest) -> anyhow::Result<PullR
 
 pub async fn ack_recordings(req: AckRecordingsRequest) -> anyhow::Result<AckRecordingsResponse> {
     let Some(index) = get_index().await else {
-        return Ok(AckRecordingsResponse { deleted: 0 });
+        return Ok(AckRecordingsResponse { acked: 0 });
     };
 
-    let deleted = index.ack(req).await?;
-    Ok(AckRecordingsResponse { deleted })
+    let acked = index.ack(req).await?;
+    Ok(AckRecordingsResponse { acked })
+}
+
+pub async fn delete_recordings(
+    req: DeleteRecordingsRequest,
+) -> anyhow::Result<DeleteRecordingsResponse> {
+    let Some(index) = get_index().await else {
+        return Ok(DeleteRecordingsResponse { deleted: 0 });
+    };
+
+    let deleted = index.delete_acked(req).await?;
+    Ok(DeleteRecordingsResponse { deleted })
 }
 
 fn record_key(info: &RecordingInfo) -> String {
@@ -291,10 +328,7 @@ fn resolve_index_path(cfg: &RecorderConfig) -> Option<PathBuf> {
         return Some(PathBuf::from(path));
     }
 
-    match &cfg.storage {
-        storage::StorageConfig::Fs { root } => Some(PathBuf::from(root).join("index.json")),
-        _ => Some(PathBuf::from("./recordings/index.json")),
-    }
+    Some(PathBuf::from("./recordings/index.json"))
 }
 
 #[cfg(feature = "recorder")]

@@ -14,6 +14,7 @@ pub struct ForwardInfo {
     pub publish_session_info: Option<SessionInfo>,
     pub subscribe_session_infos: Vec<SessionInfo>,
     pub codecs: Vec<Codec>,
+    pub has_virtual_publisher: bool,
 }
 #[derive(Clone, Debug)]
 pub struct SessionInfo {

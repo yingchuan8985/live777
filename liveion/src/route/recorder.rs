@@ -1,6 +1,6 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::response::Response;
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 
 #[cfg(feature = "recorder")]
@@ -17,10 +17,11 @@ pub fn route() -> Router<AppState> {
         )
         .route(
             api::path::recordings(),
-            post(pull_recordings).delete(ack_recordings),
+            get(pull_recordings)
+                .patch(ack_recordings)
+                .delete(delete_recordings),
         )
 }
-
 #[cfg(feature = "recorder")]
 async fn record_stream(
     State(state): State<AppState>,
@@ -103,7 +104,7 @@ async fn stop_record(
 
 #[cfg(feature = "recorder")]
 async fn pull_recordings(
-    Json(req): Json<api::recorder::PullRecordingsRequest>,
+    Query(req): Query<api::recorder::PullRecordingsRequest>,
 ) -> crate::result::Result<Json<api::recorder::PullRecordingsResponse>> {
     let resp = crate::recorder::pull_recordings(req).await?;
     Ok(Json(resp))
@@ -111,7 +112,7 @@ async fn pull_recordings(
 
 #[cfg(not(feature = "recorder"))]
 async fn pull_recordings(
-    Json(_req): Json<api::recorder::PullRecordingsRequest>,
+    Query(_req): Query<api::recorder::PullRecordingsRequest>,
 ) -> crate::result::Result<Json<api::recorder::PullRecordingsResponse>> {
     Err(AppError::Throw("feature recorder not enabled".into()))
 }
@@ -128,5 +129,20 @@ async fn ack_recordings(
 async fn ack_recordings(
     Json(_req): Json<api::recorder::AckRecordingsRequest>,
 ) -> crate::result::Result<Json<api::recorder::AckRecordingsResponse>> {
+    Err(AppError::Throw("feature recorder not enabled".into()))
+}
+
+#[cfg(feature = "recorder")]
+async fn delete_recordings(
+    Json(req): Json<api::recorder::DeleteRecordingsRequest>,
+) -> crate::result::Result<Json<api::recorder::DeleteRecordingsResponse>> {
+    let resp = crate::recorder::delete_recordings(req).await?;
+    Ok(Json(resp))
+}
+
+#[cfg(not(feature = "recorder"))]
+async fn delete_recordings(
+    Json(_req): Json<api::recorder::DeleteRecordingsRequest>,
+) -> crate::result::Result<Json<api::recorder::DeleteRecordingsResponse>> {
     Err(AppError::Throw("feature recorder not enabled".into()))
 }

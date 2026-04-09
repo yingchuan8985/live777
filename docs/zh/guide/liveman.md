@@ -38,7 +38,12 @@ connect_timeout = 30
 
 ## 录制索引与存储
 
-录制系统在数据库中存储日期索引（manifest 位置），而实际媒体文件保存在存储系统（文件系统、S3、OSS 等）。
+录制系统在数据库中存储日期索引（manifest 位置），实际媒体文件保存在配置的存储后端（文件系统或 S3）中。
+
+Liveman 还暴露了供 Liveion 异步上传队列使用的存储 API（仅 S3）：
+
+- `POST /api/storage/presign`：`{ "method": "PUT", "path": "object", "ttl_seconds": 300 }`，生成预签名 URL，需要 S3
+- `GET /api/storage/ping`：可用性探测
 
 ### 录制索引表结构
 

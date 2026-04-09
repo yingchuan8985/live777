@@ -4,10 +4,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum StorageConfig {
-    /// Local filesystem storage
+    /// Local filesystem storage (basic maintenance; no presign support)
     Fs {
-        /// Root path for storage
-        #[serde(default = "default_fs_root")]
+        /// Root directory for storing recordings
         root: String,
     },
     /// AWS S3 compatible storage
@@ -39,39 +38,14 @@ pub enum StorageConfig {
         #[serde(default)]
         enable_virtual_host_style: bool,
     },
-    /// Alibaba Cloud OSS storage
-    Oss {
-        /// OSS bucket name
-        bucket: String,
-        /// Root path within bucket
-        #[serde(default = "default_s3_root")]
-        root: String,
-        /// OSS region
-        region: String,
-        /// OSS endpoint
-        endpoint: String,
-        /// Access key ID
-        #[serde(default)]
-        access_key_id: Option<String>,
-        /// Access key secret
-        #[serde(default)]
-        access_key_secret: Option<String>,
-        /// Security token for STS
-        #[serde(default)]
-        security_token: Option<String>,
-    },
 }
 
 impl Default for StorageConfig {
     fn default() -> Self {
         Self::Fs {
-            root: default_fs_root(),
+            root: "./storage".to_string(),
         }
     }
-}
-
-fn default_fs_root() -> String {
-    "./storage".to_string()
 }
 
 fn default_s3_root() -> String {

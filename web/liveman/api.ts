@@ -89,7 +89,7 @@ export interface RecordingSession {
     end_ts: number | null;
     duration_ms: number | null;
     mpd_path: string;
-    status: 'Active' | 'Completed' | 'Failed';
+    status: 'Active' | 'Completed' | 'Failed' | 'Acked';
 }
 
 export interface RecordingSessionsResponse {

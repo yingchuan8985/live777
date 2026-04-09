@@ -9,11 +9,9 @@ pub fn create_operator(config: &StorageConfig) -> Result<Operator> {
 
     match config {
         StorageConfig::Fs { root } => {
-            tracing::info!("Configuring filesystem storage with root: {}", root);
+            tracing::info!("Configuring local filesystem storage with root: {}", root);
             let builder = services::Fs::default().root(root);
-            let op = Operator::new(builder)?.finish();
-            tracing::debug!("Filesystem storage operator created successfully");
-            Ok(op)
+            Ok(Operator::new(builder)?.finish())
         }
         StorageConfig::S3 {
             bucket,
@@ -73,48 +71,6 @@ pub fn create_operator(config: &StorageConfig) -> Result<Operator> {
 
             let op = Operator::new(builder)?.finish();
             tracing::debug!("S3 storage operator created successfully");
-            Ok(op)
-        }
-        StorageConfig::Oss {
-            bucket,
-            root,
-            region,
-            endpoint,
-            access_key_id,
-            access_key_secret,
-            security_token,
-        } => {
-            tracing::info!(
-                "Configuring OSS storage with bucket: {}, region: {}",
-                bucket,
-                region
-            );
-
-            // Use S3 service for OSS compatibility
-            let mut builder = services::S3::default()
-                .bucket(bucket)
-                .root(root.trim_start_matches('/'))
-                .region(region)
-                .endpoint(endpoint)
-                .enable_virtual_host_style();
-
-            if let Some(access_key_id) = access_key_id {
-                builder = builder.access_key_id(access_key_id);
-                tracing::debug!("OSS access key configured");
-            }
-
-            if let Some(access_key_secret) = access_key_secret {
-                builder = builder.secret_access_key(access_key_secret);
-                tracing::debug!("OSS secret key configured");
-            }
-
-            if let Some(security_token) = security_token {
-                builder = builder.session_token(security_token);
-                tracing::debug!("OSS security token configured");
-            }
-
-            let op = Operator::new(builder)?.finish();
-            tracing::debug!("OSS storage operator created successfully");
             Ok(op)
         }
     }

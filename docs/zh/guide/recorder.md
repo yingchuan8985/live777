@@ -1,6 +1,6 @@
 # Recorder
 
-liveion 的 Recorder 是一个可选功能，用于将实时流自动录制为 MP4 分片并保存到本地或云。需要在编译时启用 `recorder` 特性。
+liveion 的 Recorder 是一个可选功能，用于将实时流自动录制为 MP4 分片并保存到存储。需要在编译时启用 `recorder` 特性。
 
 ## 目前支持的编码 {#codec}
 
@@ -46,10 +46,10 @@ max_recording_seconds = 86_400
 # 可选：多节点部署的节点别名
 node_alias = "live777-node-001"
 
-# 存储后端配置
+# 存储后端配置（默认：本地文件系统）
 [recorder.storage]
-type = "fs"        # 存储类型: "fs"、"s3" 或 "oss"
-root = "./storage" # 录制文件根路径（默认："./storage"）
+type = "fs"
+root = "./storage"
 ```
 
 ### 配置选项
@@ -62,14 +62,18 @@ root = "./storage" # 录制文件根路径（默认："./storage"）
 
 #### 存储选项
 
-**文件系统 (fs)：**
+**本地文件系统后端（默认）：**
 
-- `type`: 必须为 `"fs"`
-- `root`: 根目录路径（默认：`"./storage"`）
+- `type`: `"fs"`
+- `root`: 存储录制文件的根目录（默认：`"./storage"`）
+
+::: warning
+本地文件系统后端仅支持基本录制功能。[异步上传队列](#async-upload)功能需要 S3 存储。
+:::
 
 **S3 后端：**
 
-- `type`: 必须为 `"s3"`
+- `type`: `"s3"`
 - `bucket`: S3 存储桶名称（必需）
 - `root`: 存储桶内的根路径（默认：`"/"`）
 - `region`: AWS 区域（可选，未设置时从环境自动检测）
@@ -80,26 +84,19 @@ root = "./storage" # 录制文件根路径（默认："./storage"）
 - `disable_config_load`: 设为 `true` 禁用从环境/配置文件自动加载凭证（默认：`false`）
 - `enable_virtual_host_style`: 启用虚拟主机样式请求，如 `bucket.endpoint.com` 而非 `endpoint.com/bucket`（默认：`false`）
 
-**OSS 后端：**
-
-- `type`: 必须为 `"oss"`
-- `bucket`: OSS 存储桶名称（必需）
-- `root`: 存储桶内的根路径（默认：`"/"`）
-- `region`: OSS 区域标识符，如 `"oss-cn-hangzhou"`（必需）
-- `endpoint`: OSS 端点 URL，如 `"https://oss-cn-hangzhou.aliyuncs.com"`（必需）
-- `access_key_id`: 阿里云访问密钥 ID（可选，可从环境加载）
-- `access_key_secret`: 阿里云访问密钥 Secret（可选，可从环境加载）
-- `security_token`: STS 临时凭证的安全令牌（可选）
-
 ## 存储后端 {#storage}
 
-### 本地文件系统
+### 本地文件系统（默认）
 
 ```toml
 [recorder.storage]
 type = "fs"
-root = "./storage"  # 或使用绝对路径如 "/var/lib/live777/recordings"
+root = "./storage"
 ```
+
+::: info
+本地文件系统后端支持基本录制（写入分片、更新 MPD）。不支持预签名 URL 和异步上传队列。
+:::
 
 ### AWS S3
 
@@ -149,31 +146,6 @@ secret_access_key = "minioadmin"
 enable_virtual_host_style = false
 ```
 
-### 阿里云 OSS
-
-```toml
-[recorder.storage]
-type = "oss"
-bucket = "my-oss-bucket"
-root = "/recordings"
-region = "oss-cn-hangzhou"
-endpoint = "https://oss-cn-hangzhou.aliyuncs.com"
-access_key_id = "your-access-key"
-access_key_secret = "your-access-secret"
-```
-
-使用 STS 临时凭证：
-```toml
-[recorder.storage]
-type = "oss"
-bucket = "my-oss-bucket"
-root = "/recordings"
-region = "oss-cn-hangzhou"
-endpoint = "https://oss-cn-hangzhou.aliyuncs.com"
-access_key_id = "STS..."
-access_key_secret = "..."
-security_token = "..."
-```
 
 ## 启动/状态 API {#api}
 
@@ -186,19 +158,28 @@ security_token = "..."
   - 响应: `{ "recording": true }`
 - 停止录制: `DELETE` `/api/record/:streamId`
 
+### 录制索引同步 API
+
+- 拉取会话：`GET` `/api/recordings`
+  - Query：`?stream=optional&since_ts=0&limit=200`
+- ACK 会话：`PATCH` `/api/recordings`
+  - 请求体：`{ "records": [{ "stream": "s", "record": "id" }] }`
+- 删除已 ACK 会话：`DELETE` `/api/recordings`
+  - 请求体：`{ "records": [{ "stream": "s", "record": "id" }] }`
+
 ## MPD 路径规则 {#mpd}
 
 - 默认 `record_dir`（未显式指定 `base_dir` 时）为 `/:streamId/:record_id/`，其中 `record_id` 是 10 位 Unix 时间戳。
 - 默认 MPD 位置： `/{record_dir}/manifest.mpd`。
 - 当单个录制会话累计时长达到 `max_recording_seconds` 时，Recorder 会关闭当前片段并以新的时间戳目录（如 `/:streamId/1718200000/`）继续录制，系统不会自动生成日历路径。
-- 当提供 `base_dir` 时，`record_dir` 与该值完全一致，Manifest 位于 `/{record_dir}/manifest.mpd`。若该值未以 10 位 Unix 时间戳结尾，响应中的 `record_id` 会是空字符串。
+- 当提供 `base_dir` 时，`record_dir` 与该值完全一致，Manifest 位于 `/{base_dir}/manifest.mpd`。若该值未以 10 位 Unix 时间戳结尾，响应中的 `record_id` 会是空字符串。
 
 ## 文件组织结构 {#file-structure}
 
 录制文件会根据 `record_dir` 组织：
 
 ```
-records/
+storage/
 └── stream1/
     └── 1762842203/
         ├── manifest.mpd
@@ -210,3 +191,23 @@ records/
 ```
 
 - 时间戳目录（如 `stream1/1762842203`）是 Live777 的唯一默认布局，也覆盖了 `max_recording_seconds` 触发的自动轮转。仅在非常明确的场景下才覆盖 `base_dir`，并留意这会让 `record_id` 变成空字符串。
+
+## 异步上传（预签名） {#async-upload}
+
+::: warning
+异步上传需要 S3 存储，本地文件系统后端不支持此功能。
+:::
+
+通过 Liveman 预签名接口和本地落盘队列异步上传：
+
+```toml
+[recorder.upload]
+enabled = true
+liveman_url = "http://127.0.0.1:8888"
+liveman_token = "live777"
+queue_path = "./recordings/upload_queue.jsonl"
+local_dir = "./recordings"
+presign_ttl_seconds = 300
+interval_ms = 2000
+concurrency = 2
+```

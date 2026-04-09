@@ -32,6 +32,9 @@ pub struct Config {
     #[cfg(feature = "recorder")]
     #[serde(default)]
     pub recorder: RecorderConfig,
+
+    #[serde(default)]
+    pub stream: StreamConfig,
 }
 
 #[cfg(feature = "net4mqtt")]
@@ -154,6 +157,13 @@ impl Config {
                 .validate()
                 .map_err(|e| anyhow::anyhow!(format!("ice_server error : {}", e)))?;
         }
+
+        #[cfg(feature = "source")]
+        for source in &self.stream.sources {
+            source
+                .validate()
+                .map_err(|e| anyhow::anyhow!("source config error: {}", e))?;
+        }
         Ok(())
     }
 }
@@ -180,6 +190,10 @@ pub struct RecorderConfig {
     /// Maximum duration in seconds for a single recording before rotation (0 disables auto-rotation)
     #[serde(default = "default_max_recording_seconds")]
     pub max_recording_seconds: u64,
+
+    /// Async upload configuration
+    #[serde(default)]
+    pub upload: UploadConfig,
 }
 
 #[cfg(feature = "recorder")]
@@ -196,6 +210,119 @@ impl Default for RecorderConfig {
             node_alias: None,
             index_path: None,
             max_recording_seconds: default_max_recording_seconds(),
+            upload: Default::default(),
         }
+    }
+}
+
+#[cfg(feature = "recorder")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UploadConfig {
+    /// Enable async uploads via Liveman presigned URLs
+    #[serde(default)]
+    pub enabled: bool,
+    /// Liveman base URL, e.g. http://127.0.0.1:8888
+    #[serde(default)]
+    pub liveman_url: String,
+    /// Liveman bearer token for presign API
+    #[serde(default)]
+    pub liveman_token: String,
+    /// Queue file path for pending uploads
+    #[serde(default = "default_upload_queue_path")]
+    pub queue_path: String,
+    /// Local spool directory for recordings before upload
+    #[serde(default = "default_upload_local_dir")]
+    pub local_dir: String,
+    /// Presigned URL TTL seconds
+    #[serde(default = "default_presign_ttl_seconds")]
+    pub presign_ttl_seconds: u64,
+    /// Upload loop interval in milliseconds
+    #[serde(default = "default_upload_interval_ms")]
+    pub interval_ms: u64,
+    /// Maximum concurrent uploads
+    #[serde(default = "default_upload_concurrency")]
+    pub concurrency: usize,
+}
+
+#[cfg(feature = "recorder")]
+impl Default for UploadConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            liveman_url: String::new(),
+            liveman_token: String::new(),
+            queue_path: default_upload_queue_path(),
+            local_dir: default_upload_local_dir(),
+            presign_ttl_seconds: default_presign_ttl_seconds(),
+            interval_ms: default_upload_interval_ms(),
+            concurrency: default_upload_concurrency(),
+        }
+    }
+}
+
+#[cfg(feature = "recorder")]
+fn default_upload_queue_path() -> String {
+    "./recordings/upload_queue.jsonl".to_string()
+}
+
+#[cfg(feature = "recorder")]
+fn default_upload_local_dir() -> String {
+    "./recordings".to_string()
+}
+
+#[cfg(feature = "recorder")]
+fn default_presign_ttl_seconds() -> u64 {
+    300
+}
+
+#[cfg(feature = "recorder")]
+fn default_upload_interval_ms() -> u64 {
+    2_000
+}
+
+#[cfg(feature = "recorder")]
+fn default_upload_concurrency() -> usize {
+    2
+}
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StreamConfig {
+    #[serde(default)]
+    pub sources: Vec<SourceConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceConfig {
+    /// Stream ID
+    pub stream_id: String,
+
+    /// Source URL
+    /// - RTSP: rtsp://username:password@host:port/path
+    /// - SDP file: file:///path/to/file.sdp or /path/to/file.sdp
+    pub url: String,
+}
+
+impl SourceConfig {
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if self.stream_id.trim().is_empty() {
+            anyhow::bail!("stream_id cannot be empty");
+        }
+
+        if self.url.trim().is_empty() {
+            anyhow::bail!("url cannot be empty");
+        }
+
+        let url_lower = self.url.to_lowercase();
+        if !url_lower.starts_with("rtsp://")
+            && !url_lower.starts_with("rtsps://")
+            && !url_lower.starts_with("file://")
+            && !url_lower.ends_with(".sdp")
+        {
+            anyhow::bail!(
+                "Invalid URL format: {}. Must be rtsp://, rtsps://, file://, or end with .sdp",
+                self.url
+            );
+        }
+
+        Ok(())
     }
 }

@@ -37,6 +37,8 @@ impl RecordingTask {
         manager: Arc<Manager>,
         stream: &str,
         path_prefix_override: Option<String>,
+        uploader: Option<Arc<crate::recorder::uploader::UploadManager>>,
+        local_dir: Option<String>,
     ) -> Result<Self> {
         let stream_name = stream.to_string();
         let base_dir_override = path_prefix_override;
@@ -92,7 +94,14 @@ impl RecordingTask {
         );
 
         // Initialize Segmenter
-        let mut segmenter = match Segmenter::new(op, stream_name.clone(), path_prefix.clone()).await
+        let mut segmenter = match Segmenter::new(
+            op,
+            stream_name.clone(),
+            path_prefix.clone(),
+            uploader,
+            local_dir,
+        )
+        .await
         {
             Ok(seg) => {
                 tracing::debug!(

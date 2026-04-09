@@ -12,19 +12,42 @@ urls = [
     "stun:stun.l.google.com:19302",
 ]
 
+[stream]
+
+# Need enabled `--features=source`
+[[stream.sources]]
+# stream_id = "test-source"
+# Need enabled `--features=source-sdp`
+# - SDP file: file:///path/to/file.sdp or /path/to/file.sdp
+# url = "file:///path/to/file.sdp"
+# Need enabled `--features=source-rtsp`
+# - RTSP: rtsp://username:password@host:port/path
+# url = "rtsp://username:password@host:port/path"
+
 [recorder]
 # Stream name patterns for auto-recording, supports wildcards
 # auto_streams = ["*"] # Record all streams
 # Optional path for recorder index file (index.json)
-# index_path = "./records/index.json"
+# index_path = "./storage/index.json"
 # Maximum duration in seconds before Live777 restarts a recording (0 disables auto-rotation)
 # max_recording_seconds = 86400
+
+# Async upload via Liveman presigned URLs
+# [recorder.upload]
+# enabled = false
+# liveman_url = "http://127.0.0.1:8888"
+# liveman_token = "live777"
+# queue_path = "./recordings/upload_queue.jsonl"
+# local_dir = "./recordings"
+# presign_ttl_seconds = 300
+# interval_ms = 2000
+# concurrency = 2
 
 # Storage backend configuration
 [recorder.storage]
 # Local filesystem (default)
 type = "fs"
-root = "./records"
+root = "./storage"
 
 # AWS S3 with explicit credentials
 #type = "s3"
@@ -40,14 +63,8 @@ root = "./records"
 #root = "/recordings"
 #region = "us-east-1"
 
-# Alibaba Cloud OSS
-#type = "oss"
-#bucket = "my-oss-bucket"
-#root = "/recordings"
-#region = "oss-cn-hangzhou"
-#endpoint = "https://oss-cn-hangzhou.aliyuncs.com"
-#access_key_id = "your-access-key"
-#access_key_secret = "your-access-secret"    
+# Optional: custom endpoint for S3-compatible storage
+#endpoint = "http://localhost:9000"
 
 # [[ice_servers]]
 # urls = [ "turn:turn.22333.fun", "turn:cn.22333.fun" ]

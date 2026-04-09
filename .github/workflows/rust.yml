@@ -15,9 +15,9 @@ jobs:
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Setup ffmpeg
-        uses: AnimMouse/setup-ffmpeg@v1
+        uses: AnimMouse/setup-ffmpeg@v1.2.3
       - name: Show version information
         run: |
           ffmpeg -version
@@ -43,9 +43,9 @@ jobs:
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
       - name: Setup Nodejs
         uses: actions/setup-node@v6
         with:
@@ -58,7 +58,7 @@ jobs:
       - name: Build
         run: cargo build --all-targets --all-features --release --verbose
       - name: Setup ffmpeg
-        uses: AnimMouse/setup-ffmpeg@v1
+        uses: AnimMouse/setup-ffmpeg@v1.2.3
       - name: Show version information
         run: |
           ffmpeg -version

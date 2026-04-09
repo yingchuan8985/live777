@@ -29,6 +29,8 @@ pub enum RecordingStatus {
     Completed,
     /// Recording failed or was interrupted
     Failed,
+    /// Recording was acknowledged by manager
+    Acked,
 }
 
 impl std::fmt::Display for RecordingStatus {
@@ -37,6 +39,7 @@ impl std::fmt::Display for RecordingStatus {
             RecordingStatus::Active => write!(f, "Active"),
             RecordingStatus::Completed => write!(f, "Completed"),
             RecordingStatus::Failed => write!(f, "Failed"),
+            RecordingStatus::Acked => write!(f, "Acked"),
         }
     }
 }
@@ -49,6 +52,7 @@ impl FromStr for RecordingStatus {
             "Active" => Ok(RecordingStatus::Active),
             "Completed" => Ok(RecordingStatus::Completed),
             "Failed" => Ok(RecordingStatus::Failed),
+            "Acked" => Ok(RecordingStatus::Acked),
             _ => Err(()),
         }
     }
@@ -81,15 +85,27 @@ pub struct RecordingKey {
     pub record: String,
 }
 
-/// Request to acknowledge and delete recordings from index
+/// Request to acknowledge recordings in index
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AckRecordingsRequest {
     pub records: Vec<RecordingKey>,
 }
 
-/// Response for ack/delete
+/// Response for ack
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AckRecordingsResponse {
+    pub acked: usize,
+}
+
+/// Request to delete recordings from index (only acked entries are removed)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeleteRecordingsRequest {
+    pub records: Vec<RecordingKey>,
+}
+
+/// Response for delete
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeleteRecordingsResponse {
     pub deleted: usize,
 }
 

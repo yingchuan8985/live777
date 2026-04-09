@@ -9,7 +9,9 @@ use url::Url;
 use crate::service::recordings_index::RecordingsIndexService;
 use crate::{AppState, error::AppError, result::Result, route::utils::session_delete};
 
-use api::recorder::{AckRecordingsRequest, PullRecordingsRequest, RecordingKey};
+use api::recorder::{
+    AckRecordingsRequest, DeleteRecordingsRequest, PullRecordingsRequest, RecordingKey,
+};
 
 pub async fn cascade_check(state: AppState) {
     loop {
@@ -305,9 +307,9 @@ async fn do_record_sync(mut state: AppState) -> Result<()> {
         let url = format!("{}{}", server.url, api::path::recordings());
         let resp = match state
             .client
-            .post(url)
+            .get(url)
             .header(header::AUTHORIZATION, format!("Bearer {}", server.token))
-            .json(&req)
+            .query(&req)
             .send()
             .await
         {
@@ -383,13 +385,13 @@ async fn do_record_sync(mut state: AppState) -> Result<()> {
         if ack_records.is_empty() {
             should_advance = pull.last_ts.is_some();
         } else {
-            let ack_url = format!("{}{}", server.url, api::path::recordings());
+            let ack_url = format!("{}{}", server.url, api::path::recordings_ack());
             let ack_req = AckRecordingsRequest {
                 records: ack_records,
             };
             match state
                 .client
-                .delete(ack_url)
+                .patch(ack_url)
                 .header(header::AUTHORIZATION, format!("Bearer {}", server.token))
                 .json(&ack_req)
                 .send()
@@ -407,6 +409,33 @@ async fn do_record_sync(mut state: AppState) -> Result<()> {
                 }
                 Err(e) => {
                     warn!(node = %server.alias, error = ?e, "record_sync ack failed");
+                }
+            }
+
+            if should_advance {
+                let delete_url = format!("{}{}", server.url, api::path::recordings_delete());
+                let delete_req = DeleteRecordingsRequest {
+                    records: ack_req.records,
+                };
+                match state
+                    .client
+                    .delete(delete_url)
+                    .header(header::AUTHORIZATION, format!("Bearer {}", server.token))
+                    .json(&delete_req)
+                    .send()
+                    .await
+                {
+                    Ok(r) if r.status().is_success() => {}
+                    Ok(r) => {
+                        warn!(
+                            node = %server.alias,
+                            status = %r.status(),
+                            "record_sync delete failed"
+                        );
+                    }
+                    Err(e) => {
+                        warn!(node = %server.alias, error = ?e, "record_sync delete failed");
+                    }
                 }
             }
         }

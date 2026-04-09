@@ -1,24 +1,32 @@
 # Must Lock image
-# trixie-20251103-slim use gstreamer 1.26.2
-FROM debian:trixie-20251103-slim AS common
+# trixie-slim use gstreamer 1.26.2
+FROM debian:trixie-slim AS common
 
 RUN apt update -y && apt install -y --no-install-recommends ca-certificates
 
 RUN apt install -y --no-install-recommends libglib2.0-dev libssl-dev \
-    libgstreamer1.0-dev gstreamer1.0-tools gstreamer1.0-libav \
+    gstreamer1.0-tools gstreamer1.0-libav \
+    libgstreamer1.0-dev libgstrtspserver-1.0-dev \
     libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base \
     gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
     libpango1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-nice
 
 FROM common AS builder
 
-# trixie-20251103-slim use gstreamer 1.26.2
+# trixie-20260223-slim use gstreamer 1.26.2
 ENV GST_VER=1.26.2
 # cargo 1.85.0 (d73d2caf9 2024-12-31)
 # rustc 1.85.0 (4d91de4e4 2025-02-17)
 RUN apt install -y --no-install-recommends cargo cargo-c
 
 WORKDIR /app
+
+COPY tools/test-rtsp-server.c test-rtsp-server.c
+
+RUN gcc -o test-rtsp-server test-rtsp-server.c $(pkg-config --cflags --libs gstreamer-1.0 gstreamer-rtsp-server-1.0)
+
+# gstreamer-rtsp-server:
+# ./test-rtsp-server "( videotestsrc ! x264enc ! rtph264pay name=pay0 pt=96 )"
 
 ADD https://gitlab.freedesktop.org/gstreamer/gst-plugins-rs/-/archive/gstreamer-${GST_VER}/gst-plugins-rs-gstreamer-${GST_VER}.tar.gz gst-plugins-rs-gstreamer.tar.gz
 
@@ -41,6 +49,8 @@ RUN cargo cinstall --package gst-plugin-rtp --prefix=/app --libdir=pkg/usr/lib/$
 RUN rm pkg/usr/lib/$(gcc -dumpmachine)/gstreamer-1.0/libgstrsrtp.a
 
 FROM common
+
+COPY --from=builder /app/test-rtsp-server /usr/local/bin/
 
 COPY --from=builder /app/pkg/ /
 

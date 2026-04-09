@@ -17,4 +17,4 @@ http-body = { workspace = true }
 serde = { workspace = true, features = ["serde_derive"] }
 
 headers = "0.4"
-jsonwebtoken = "9.3"
+jsonwebtoken = "10.3"

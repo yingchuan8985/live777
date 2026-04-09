@@ -11,7 +11,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Setup Biome
@@ -27,7 +27,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Show version information
         run: |
           cargo --version
@@ -42,7 +42,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Show version information
         run: |
           cargo --version
@@ -52,10 +52,10 @@ jobs:
       - name: Cargo clippy default-features
         run: cargo clippy --all-targets --workspace -- -D warnings
       - name: Cargo clippy no webui
-        run: cargo clippy --all-targets --features=net4mqtt,recorder --workspace -- -D warnings
+        run: cargo clippy --all-targets --features=net4mqtt,recorder,source-all --workspace -- -D warnings
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
       - uses: actions/setup-node@v6
         with:
           node-version: latest
