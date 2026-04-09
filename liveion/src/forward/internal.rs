@@ -470,7 +470,7 @@ impl PeerForwardInternal {
         let dc_rx = self.data_channel_forward.subscribe.subscribe();
         let dc_tx = self.data_channel_forward.publish.clone();
         let stream_cfg = self.ptz_udp.streams.get(&self.stream).cloned();
-        super::channel::spawn_ptz_udp(
+        super::channel::spawn_channel(
             self.stream.clone(),
             dc_rx,
             dc_tx,
