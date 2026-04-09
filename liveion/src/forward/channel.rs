@@ -1,19 +1,17 @@
 /// DataChannel ↔ UDP bidirectional forwarding
 ///
-/// Each stream maps to one independent UDP port.
-/// All message types are forwarded to the same port;
-/// the downstream is responsible for parsing the message_type field.
+/// Each stream maps to one independent UDP endpoint configured via URL:
+///   udp://<listen_addr>:<listen_port>?host=<target_host>&port=<target_port>
+///
+/// - listen_addr:listen_port  — liveion binds here to receive replies from downstream
+/// - target_host:target_port  — liveion sends DataChannel messages to this address
 ///
 /// Configuration example (conf/live777.toml):
 ///   [ptz_udp.streams.camera]
-///   udp_port    = 8890   # target port for all control messages
-///   listen_port = 8891   # UDP inbound listen port (for replies)
-///   target_host = "127.0.0.1"
+///   url = "udp://127.0.0.1:7774?host=127.0.0.1&port=1234"
 ///
 ///   [ptz_udp.streams.camera2]
-///   udp_port    = 8990
-///   listen_port = 8991
-///   target_host = "127.0.0.1"
+///   url = "udp://127.0.0.1:7775?host=127.0.0.1&port=1235"
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -25,7 +23,7 @@ use tracing::{debug, info, warn};
 use crate::config::PtzUdpStream;
 
 /// Spawn bidirectional forwarding tasks.
-/// If `stream_cfg` is None (stream not configured), this is a no-op.
+/// If `stream_cfg` is None or the URL is invalid, this is a no-op.
 pub async fn spawn_ptz_udp(
     stream: String,
     mut dc_rx: broadcast::Receiver<Vec<u8>>,
@@ -40,18 +38,26 @@ pub async fn spawn_ptz_udp(
         }
     };
 
-    let target = format!("{}:{}", cfg.target_host, cfg.udp_port);
-    let listen_addr = format!("0.0.0.0:{}", cfg.listen_port);
+    let (listen_addr, listen_port, target_host, target_port) = match cfg.parse() {
+        Some(v) => v,
+        None => {
+            warn!("ptz_udp [{}]: invalid url: {}", stream, cfg.url);
+            return;
+        }
+    };
 
-    info!("ptz_udp [{}]: udp_port={} listen_port={}", stream, cfg.udp_port, cfg.listen_port);
+    let target = format!("{}:{}", target_host, target_port);
+    let bind_addr = format!("{}:{}", listen_addr, listen_port);
+
+    info!("ptz_udp [{}]: listen={} target={}", stream, bind_addr, target);
 
     let send_socket = match UdpSocket::bind("0.0.0.0:0").await {
         Ok(s) => Arc::new(s),
         Err(e) => { warn!("ptz_udp [{}]: bind send socket failed: {}", stream, e); return; }
     };
 
-    let recv_socket = match UdpSocket::bind(&listen_addr).await {
-        Ok(s) => { info!("ptz_udp [{}]: listening on {}", stream, listen_addr); Arc::new(s) }
+    let recv_socket = match UdpSocket::bind(&bind_addr).await {
+        Ok(s) => { info!("ptz_udp [{}]: listening on {}", stream, bind_addr); Arc::new(s) }
         Err(e) => { warn!("ptz_udp [{}]: bind recv socket failed: {}", stream, e); return; }
     };
 

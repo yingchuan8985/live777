@@ -115,23 +115,46 @@ impl Default for Log {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PtzUdp {
-    /// Per-stream UDP port configuration, keyed by stream name.
+    /// Per-stream UDP configuration, keyed by stream name.
+    /// URL format: udp://<listen_addr>:<listen_port>?host=<target_host>&port=<target_port>
+    /// Example:
+    ///   [ptz_udp.streams.camera]
+    ///   url = "udp://127.0.0.1:7774?host=127.0.0.1&port=1234"
     #[serde(default)]
     pub streams: std::collections::HashMap<String, PtzUdpStream>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PtzUdpStream {
-    /// Target port for all control messages (downstream parses message_type)
-    pub udp_port: u16,
-    /// UDP inbound listen port for replies from downstream
-    pub listen_port: u16,
-    /// Target host, default "127.0.0.1"
-    #[serde(default = "default_target_host")]
-    pub target_host: String,
+    /// UDP URL: udp://<listen_addr>:<listen_port>?host=<target_host>&port=<target_port>
+    pub url: String,
 }
 
-fn default_target_host() -> String { "127.0.0.1".to_string() }
+impl PtzUdpStream {
+    /// Parse the URL into (listen_addr, listen_port, target_host, target_port).
+    pub fn parse(&self) -> Option<(String, u16, String, u16)> {
+        // Expected format: udp://listen_addr:listen_port?host=target_host&port=target_port
+        let s = self.url.strip_prefix("udp://")?;
+        let (host_port, query) = s.split_once('?')?;
+        let (listen_addr, listen_port_str) = host_port.rsplit_once(':')?;
+        let listen_port: u16 = listen_port_str.parse().ok()?;
+
+        let mut target_host = String::new();
+        let mut target_port: u16 = 0;
+        for param in query.split('&') {
+            if let Some(v) = param.strip_prefix("host=") {
+                target_host = v.to_string();
+            } else if let Some(v) = param.strip_prefix("port=") {
+                target_port = v.parse().ok()?;
+            }
+        }
+
+        if target_host.is_empty() || target_port == 0 {
+            return None;
+        }
+        Some((listen_addr.to_string(), listen_port, target_host, target_port))
+    }
+}
 
 impl Default for PtzUdp {
     fn default() -> Self {
