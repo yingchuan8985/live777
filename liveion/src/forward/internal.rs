@@ -30,7 +30,7 @@ use webrtc::track::track_local::track_local_static_rtp::TrackLocalStaticRTP;
 use webrtc::track::track_remote::TrackRemote;
 
 use crate::AppError;
-use crate::config::PtzUdp;
+use crate::config::Channel;
 use crate::forward::get_peer_id;
 use crate::forward::message::{ForwardInfo, SessionInfo};
 use crate::forward::rtcp::RtcpMessage;
@@ -64,11 +64,11 @@ pub(crate) struct PeerForwardInternal {
     data_channel_forward: DataChannelForward,
     ice_server: Vec<RTCIceServer>,
     event_sender: broadcast::Sender<ForwardEvent>,
-    ptz_udp: PtzUdp,
+    ptz_udp: Channel,
 }
 
 impl PeerForwardInternal {
-    pub(crate) fn new(stream: impl ToString, ice_server: Vec<RTCIceServer>, ptz_udp: PtzUdp) -> Self {
+    pub(crate) fn new(stream: impl ToString, ice_server: Vec<RTCIceServer>, ptz_udp: Channel) -> Self {
         PeerForwardInternal {
             stream: stream.to_string(),
             create_at: Utc::now().timestamp_millis(),

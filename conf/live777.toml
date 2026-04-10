@@ -1,24 +1,24 @@
-# PTZ UDP forwarding configuration.
-# Each stream has one independent UDP endpoint.
+# Channel forwarding configuration.
+# Each stream has one independent channel endpoint.
 # URL format: udp://<listen_addr>:<listen_port>?host=<target_host>&port=<target_port>
 #   listen_addr:listen_port  - liveion listens here for replies from downstream
 #   target_host:target_port  - liveion sends DataChannel messages to this address
 #
-# [ptz_udp.streams.camera]
-# url = "udp://127.0.0.1:7774?host=127.0.0.1&port=1234"
+# [channel.streams.camera]
+# url = "udp://0.0.0.0:7774?host=127.0.0.1&port=1234"
 #
-# [ptz_udp.streams.camera2]
-# url = "udp://127.0.0.1:7775?host=127.0.0.1&port=1235"
+# [channel.streams.camera2]
+# url = "udp://0.0.0.0:7775?host=127.0.0.1&port=1235"
 
-[ptz_udp.streams.webcontrol]
-url = "udp://127.0.0.1:8891?host=127.0.0.1&port=8890"
+[channel.streams.webcontrol]
+url = "udp://0.0.0.0:8891?host=127.0.0.1&port=8890"
 
 [http]
 # Http Server Listen Address
 # listen = "[::]:7777"
 # Cross-Origin Resource Sharing (CORS)
 # reference: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
-cors = true
+# cors = false
 
 [[ice_servers]]
 urls = [

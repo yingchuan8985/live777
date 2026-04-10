@@ -1,4 +1,4 @@
-use crate::config::{Config, PtzUdp};
+use crate::config::{Config, Channel};
 
 use webrtc::ice_transport::ice_server::RTCIceServer;
 
@@ -11,7 +11,7 @@ pub struct ManagerConfig {
     pub auto_create_sub: bool,
     pub auto_delete_pub: i64,
     pub auto_delete_sub: i64,
-    pub ptz_udp: PtzUdp,
+    pub channel: Channel,
 }
 
 impl ManagerConfig {
@@ -30,7 +30,7 @@ impl ManagerConfig {
             auto_create_sub: cfg.strategy.auto_create_whep,
             auto_delete_pub: cfg.strategy.auto_delete_whip.0,
             auto_delete_sub: cfg.strategy.auto_delete_whep.0,
-            ptz_udp: cfg.ptz_udp,
+            channel: cfg.channel,
         }
     }
 }

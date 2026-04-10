@@ -27,7 +27,7 @@ pub struct Config {
     pub webhook: Webhook,
 
     #[serde(default)]
-    pub ptz_udp: PtzUdp,
+    pub channel: Channel,
 
     #[cfg(feature = "recorder")]
     #[serde(default)]
@@ -114,49 +114,50 @@ impl Default for Log {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct PtzUdp {
-    /// Per-stream UDP configuration, keyed by stream name.
+pub struct Channel {
+    /// Per-stream channel configuration, keyed by stream name.
     /// URL format: udp://<listen_addr>:<listen_port>?host=<target_host>&port=<target_port>
     /// Example:
-    ///   [ptz_udp.streams.camera]
+    ///   [channel.streams.camera]
     ///   url = "udp://127.0.0.1:7774?host=127.0.0.1&port=1234"
     #[serde(default)]
-    pub streams: std::collections::HashMap<String, PtzUdpStream>,
+    pub streams: std::collections::HashMap<String, ChannelStream>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct PtzUdpStream {
-    /// UDP URL: udp://<listen_addr>:<listen_port>?host=<target_host>&port=<target_port>
+pub struct ChannelStream {
+    /// Channel URL, currently supports UDP:
+    /// udp://<listen_addr>:<listen_port>?host=<target_host>&port=<target_port>
     pub url: String,
 }
 
-impl PtzUdpStream {
+impl ChannelStream {
     /// Parse the URL into (listen_addr, listen_port, target_host, target_port).
+    /// Supported format: udp://<listen_addr>:<listen_port>?host=<target_host>&port=<target_port>
     pub fn parse(&self) -> Option<(String, u16, String, u16)> {
-        // Expected format: udp://listen_addr:listen_port?host=target_host&port=target_port
-        let s = self.url.strip_prefix("udp://")?;
-        let (host_port, query) = s.split_once('?')?;
-        let (listen_addr, listen_port_str) = host_port.rsplit_once(':')?;
-        let listen_port: u16 = listen_port_str.parse().ok()?;
-
+        let url = url::Url::parse(&self.url).ok()?;
+        if url.scheme() != "udp" {
+            return None;
+        }
+        let listen_addr = url.host_str()?.to_string();
+        let listen_port = url.port()?;
         let mut target_host = String::new();
         let mut target_port: u16 = 0;
-        for param in query.split('&') {
-            if let Some(v) = param.strip_prefix("host=") {
-                target_host = v.to_string();
-            } else if let Some(v) = param.strip_prefix("port=") {
-                target_port = v.parse().ok()?;
+        for (key, value) in url.query_pairs() {
+            match key.as_ref() {
+                "host" => target_host = value.into_owned(),
+                "port" => target_port = value.parse().ok()?,
+                _ => {}
             }
         }
-
         if target_host.is_empty() || target_port == 0 {
             return None;
         }
-        Some((listen_addr.to_string(), listen_port, target_host, target_port))
+        Some((listen_addr, listen_port, target_host, target_port))
     }
 }
 
-impl Default for PtzUdp {
+impl Default for Channel {
     fn default() -> Self {
         Self { streams: std::collections::HashMap::new() }
     }

@@ -14,7 +14,7 @@ use webrtc::sdp::SessionDescription;
 
 use libwish::Client;
 
-use crate::config::PtzUdp;
+use crate::config::Channel;
 #[cfg(feature = "source")]
 pub use bridge::SourceBridge;
 #[cfg(feature = "source")]
@@ -72,11 +72,11 @@ pub struct AudioTrackInfo {
 }
 
 impl PeerForward {
-    pub fn new(stream: impl ToString, ice_server: Vec<RTCIceServer>, ptz_udp: PtzUdp) -> Self {
+    pub fn new(stream: impl ToString, ice_server: Vec<RTCIceServer>, channel: Channel) -> Self {
         PeerForward {
             stream: stream.to_string(),
             publish_lock: Arc::new(Mutex::new(())),
-            internal: Arc::new(PeerForwardInternal::new(stream, ice_server, ptz_udp)),
+            internal: Arc::new(PeerForwardInternal::new(stream, ice_server, channel)),
         }
     }
     pub fn subscribe_event(&self) -> broadcast::Receiver<ForwardEvent> {
