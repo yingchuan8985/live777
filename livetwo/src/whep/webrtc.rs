@@ -1,7 +1,9 @@
+use std::sync::Arc;
+
 use anyhow::{Result, anyhow};
 use libwish::Client;
-use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, trace, warn};
 use webrtc::{
     peer_connection::{RTCPeerConnection, sdp::session_description::RTCSessionDescription},
@@ -19,23 +21,17 @@ use crate::utils;
 use crate::utils::stats::RtcpStats;
 
 pub async fn setup_whep_peer(
+    ct: CancellationToken,
     client: &mut Client,
     video_send: UnboundedSender<Vec<u8>>,
     audio_send: UnboundedSender<Vec<u8>>,
-    complete_tx: UnboundedSender<()>,
     codec_info: Arc<tokio::sync::Mutex<rtsp::CodecInfo>>,
 ) -> Result<(
     Arc<RTCPeerConnection>,
     RTCSessionDescription,
     Arc<RtcpStats>,
 )> {
-    let peer = create_peer(
-        video_send,
-        audio_send,
-        complete_tx.clone(),
-        codec_info.clone(),
-    )
-    .await?;
+    let peer = create_peer(ct, video_send, audio_send, codec_info.clone()).await?;
 
     utils::webrtc::setup_connection(peer.clone(), client).await?;
 
@@ -119,9 +115,9 @@ async fn setup_rtcp_listener_for_senders(peer: Arc<RTCPeerConnection>, stats: Ar
 }
 
 async fn create_peer(
+    ct: CancellationToken,
     video_send: UnboundedSender<Vec<u8>>,
     audio_send: UnboundedSender<Vec<u8>>,
-    complete_tx: UnboundedSender<()>,
     codec_info: Arc<tokio::sync::Mutex<rtsp::CodecInfo>>,
 ) -> Result<Arc<RTCPeerConnection>> {
     let (api, config) = utils::webrtc::create_api().await?;
@@ -153,7 +149,7 @@ async fn create_peer(
     .await
     .map_err(|error| anyhow!(format!("{:?}: {}", error, error)))?;
 
-    utils::webrtc::setup_handlers(peer.clone(), complete_tx).await;
+    utils::webrtc::setup_handlers(ct, peer.clone()).await;
 
     peer.on_track(Box::new({
         let codec_info = codec_info.clone();

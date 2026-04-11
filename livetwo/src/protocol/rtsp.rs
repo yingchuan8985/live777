@@ -2,12 +2,13 @@ use anyhow::Result;
 use std::sync::Arc;
 use tokio::sync::Notify;
 use tokio::sync::mpsc::UnboundedReceiver;
+use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 pub async fn setup_server_for_push(
+    _ct: CancellationToken,
     listen_host: &str,
     port: u16,
-    _complete_tx: tokio::sync::mpsc::UnboundedSender<()>,
 ) -> Result<(
     rtsp::MediaInfo,
     Option<rtsp::channels::InterleavedChannel>,
@@ -21,10 +22,10 @@ pub async fn setup_server_for_push(
 }
 
 pub async fn setup_server_for_pull(
+    _ct: CancellationToken,
     listen_host: &str,
     port: u16,
     filtered_sdp: String,
-    _complete_tx: tokio::sync::mpsc::UnboundedSender<()>,
     _notify: Arc<Notify>,
 ) -> Result<(
     rtsp::MediaInfo,

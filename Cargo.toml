@@ -86,6 +86,7 @@ reqwest = { version = "0.12", features = [
 serde = "1.0"
 serde_json = "1.0"
 tokio = "1.47"
+tokio-util = "0.7.18"
 tracing = "0.1"
 uuid = { version = "1", features = ["v4", "fast-rng"] }
 url = "2.5"
@@ -114,6 +115,7 @@ api = { path = "libs/api" }
 
 clap = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = ["process"] }
+tokio-util = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 axum = { workspace = true }

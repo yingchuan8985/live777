@@ -1,74 +1,36 @@
 use std::sync::Arc;
-use tokio::sync::{Mutex, broadcast};
+use std::time::Duration;
 use tracing::{info, warn};
 
-#[derive(Clone)]
-pub struct ShutdownSignal {
-    notify: Arc<broadcast::Sender<()>>,
-    is_shutdown: Arc<Mutex<bool>>,
-}
+use libwish::Client;
 
-impl ShutdownSignal {
-    pub fn new() -> Self {
-        let (notify, _) = broadcast::channel(1);
-        Self {
-            notify: Arc::new(notify),
-            is_shutdown: Arc::new(Mutex::new(false)),
-        }
-    }
+pub async fn graceful_shutdown(
+    name: &str,
+    client: &mut Client,
+    peer: Arc<::webrtc::peer_connection::RTCPeerConnection>,
+) {
+    info!("Starting {} graceful shutdown", name);
 
-    /// Trigger shutdown signal
-    pub async fn shutdown(&self) {
-        let mut is_shutdown = self.is_shutdown.lock().await;
-        if !*is_shutdown {
-            *is_shutdown = true;
-            info!("Shutdown signal triggered");
-            let _ = self.notify.send(());
-        }
-    }
+    let shutdown_timeout = Duration::from_secs(5);
 
-    /// Subscribe to shutdown signal
-    pub fn subscribe(&self) -> broadcast::Receiver<()> {
-        self.notify.subscribe()
-    }
-
-    /// Check if already shutdown
-    pub async fn is_shutdown(&self) -> bool {
-        *self.is_shutdown.lock().await
-    }
-
-    /// Wait for shutdown signal
-    pub async fn wait(&self) {
-        let mut rx = self.subscribe();
-        let _ = rx.recv().await;
-    }
-}
-
-impl Default for ShutdownSignal {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Wait for system signal or manual shutdown signal
-pub async fn wait_for_shutdown(
-    shutdown: ShutdownSignal,
-    mut complete_rx: tokio::sync::mpsc::UnboundedReceiver<()>,
-) -> String {
     tokio::select! {
-        _ = complete_rx.recv() => {
-            info!("Received completion signal");
-            shutdown.shutdown().await;
-            "completion".to_string()
+        _ = async {
+            match client.remove_resource().await {
+                Ok(_) => info!("{} resource removed successfully", name),
+                Err(e) => warn!("Failed to remove {} resource: {}", name, e),
+            }
+
+            match peer.close().await {
+                Ok(_) => info!("PeerConnection closed successfully"),
+                Err(e) => warn!("Failed to close peer connection: {}", e),
+            }
+
+            info!("WebRTC resources cleaned up");
+        } => {
+            info!("{} graceful shutdown completed", name);
         }
-        msg = signal::wait_for_stop_signal() => {
-            warn!("Received system signal: {}", msg);
-            shutdown.shutdown().await;
-            msg.to_string()
-        }
-        _ = shutdown.wait() => {
-            info!("Received shutdown signal");
-            "shutdown".to_string()
+        _ = tokio::time::sleep(shutdown_timeout) => {
+            warn!("{} graceful shutdown timed out after {:?}", name, shutdown_timeout);
         }
     }
 }

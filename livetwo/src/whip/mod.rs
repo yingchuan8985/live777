@@ -1,25 +1,27 @@
+use std::sync::Arc;
+use std::time::Duration;
+
+use anyhow::Result;
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
+use tracing::info;
+
 mod input;
 mod track;
 mod webrtc;
-
-use anyhow::Result;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::mpsc::unbounded_channel;
-use tokio::task::JoinHandle;
-use tracing::{info, warn};
 
 use cli::create_child;
 use libwish::Client;
 
 use crate::transport;
-use crate::utils::shutdown::{ShutdownSignal, wait_for_shutdown};
+use crate::utils::shutdown::graceful_shutdown;
 use crate::utils::stats::start_stats_monitor;
 
 pub use input::InputSource;
 pub use webrtc::setup_whip_peer;
 
 pub async fn into(
+    ct: CancellationToken,
     target_url: String,
     whip_url: String,
     token: Option<String>,
@@ -27,15 +29,11 @@ pub async fn into(
 ) -> Result<()> {
     info!("Starting WHIP session: {}", target_url);
 
-    let shutdown = ShutdownSignal::new();
-    let shutdown_clone = shutdown.clone();
-
-    let (complete_tx, complete_rx) = unbounded_channel();
     let mut client = Client::new(whip_url.clone(), Client::get_auth_header_map(token.clone()));
 
     let child = Arc::new(create_child(command)?);
 
-    let mut input_source = input::setup_input_source(&target_url, complete_tx.clone()).await?;
+    let mut input_source = input::setup_input_source(ct.clone(), &target_url).await?;
     info!("Input source configured: {:?}", input_source.scheme());
 
     let (original_target, original_listen) = input_source.address_config();
@@ -44,18 +42,18 @@ pub async fn into(
     let port_update_rx = input_source.take_port_update_rx();
 
     let (peer, video_sender, audio_sender, stats) = webrtc::setup_whip_peer(
+        ct.clone(),
         &mut client,
         input_source.media_info(),
-        complete_tx.clone(),
         target_url.clone(),
     )
     .await?;
     info!("WebRTC peer connection established");
 
-    start_stats_monitor(peer.clone(), stats.clone(), shutdown.clone()).await;
+    start_stats_monitor(ct.clone(), peer.clone(), stats.clone()).await;
 
     let stats_clone = stats.clone();
-    let shutdown_stats = shutdown.clone();
+    let ct_clone = ct.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(10));
 
@@ -65,7 +63,7 @@ pub async fn into(
                     let summary = stats_clone.get_summary().await;
                     info!("{}", summary.format());
                 }
-                _ = shutdown_stats.wait() => {
+                _ = ct_clone.cancelled() => {
                     info!("Stats reporter shutting down");
                     let final_summary = stats_clone.get_summary().await;
                     info!("Final Statistics:\n{}", final_summary.format());
@@ -92,8 +90,7 @@ pub async fn into(
         let audio_sender_clone = audio_sender.clone();
         let peer_clone = peer.clone();
         let config_clone = original_config.clone();
-        let shutdown_port = shutdown.clone();
-
+        let ct_clone = ct.clone();
         tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -139,7 +136,7 @@ pub async fn into(
                             }
                         }
                     }
-                    _ = shutdown_port.wait() => {
+                    _ = ct_clone.cancelled() => {
                         info!("Port update listener shutting down");
                         break;
                     }
@@ -149,10 +146,8 @@ pub async fn into(
     }
 
     if child.as_ref().is_some() {
-        let shutdown_child = shutdown.clone();
-        let complete_tx_child = complete_tx.clone();
         let child_clone = child.clone();
-
+        let ct_clone = ct.clone();
         tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -161,11 +156,11 @@ pub async fn into(
                             && let Ok(mut child_guard) = child_guard_wrapper.lock()
                             && let Ok(Some(status)) = child_guard.try_wait() {
                                 info!("Child process exited with status: {:?}", status);
-                                let _ = complete_tx_child.send(());
+                                ct_clone.cancel();
                                 break;
                             }
                     }
-                    _ = shutdown_child.wait() => {
+                    _ = ct_clone.cancelled() => {
                         break;
                     }
                 }
@@ -173,40 +168,8 @@ pub async fn into(
         });
     }
 
-    let reason = wait_for_shutdown(shutdown_clone, complete_rx).await;
-    info!("Shutting down WHIP session, reason: {}", reason);
-
-    graceful_shutdown(&mut client, peer).await;
+    ct.cancelled().await;
+    graceful_shutdown("WHIP", &mut client, peer).await;
 
     Ok(())
-}
-
-async fn graceful_shutdown(
-    client: &mut Client,
-    peer: Arc<::webrtc::peer_connection::RTCPeerConnection>,
-) {
-    info!("Starting WHIP graceful shutdown");
-
-    let shutdown_timeout = Duration::from_secs(5);
-
-    tokio::select! {
-        _ = async {
-            match client.remove_resource().await {
-                Ok(_) => info!("WHIP resource removed successfully"),
-                Err(e) => warn!("Failed to remove WHIP resource: {}", e),
-            }
-
-            match peer.close().await {
-                Ok(_) => info!("PeerConnection closed successfully"),
-                Err(e) => warn!("Failed to close peer connection: {}", e),
-            }
-
-            info!("WebRTC resources cleaned up");
-        } => {
-            info!("WHIP graceful shutdown completed");
-        }
-        _ = tokio::time::sleep(shutdown_timeout) => {
-            warn!("WHIP graceful shutdown timed out after {:?}", shutdown_timeout);
-        }
-    }
 }

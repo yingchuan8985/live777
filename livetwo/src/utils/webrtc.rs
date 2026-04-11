@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use libwish::Client;
 use std::sync::Arc;
-use tokio::sync::mpsc::UnboundedSender;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 use webrtc::{
     api::{APIBuilder, interceptor_registry::register_default_interceptors, media_engine::*},
@@ -69,11 +69,11 @@ pub async fn setup_connection(
     Ok(answer)
 }
 
-pub async fn setup_handlers(peer: Arc<RTCPeerConnection>, complete_tx: UnboundedSender<()>) {
+pub async fn setup_handlers(ct: CancellationToken, peer: Arc<RTCPeerConnection>) {
     let pc = peer.clone();
     peer.on_peer_connection_state_change(Box::new(move |s| {
         let pc = pc.clone();
-        let complete_tx = complete_tx.clone();
+        let ct_clone = ct.clone();
         tokio::spawn(async move {
             warn!("Connection state changed: {}", s);
             match s {
@@ -82,7 +82,7 @@ pub async fn setup_handlers(peer: Arc<RTCPeerConnection>, complete_tx: Unbounded
                     warn!("Connection closed due to failure or disconnection");
                 }
                 RTCPeerConnectionState::Closed => {
-                    let _ = complete_tx.send(());
+                    ct_clone.cancel();
                     info!("Connection closed normally");
                 }
                 _ => debug!("Connection state: {}", s),

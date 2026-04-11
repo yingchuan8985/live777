@@ -3,6 +3,8 @@ use std::time::Duration;
 
 use tokio::net::TcpListener;
 use tokio::process::Command;
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 mod common;
 use common::shutdown_signal;
@@ -73,7 +75,7 @@ const CONNECTION_CHECK_INTERVAL_MS: u64 = 100;
 const MAX_CONNECTION_ATTEMPTS: u32 = 100;
 const STREAM_STABILIZATION_MS: u64 = 1000;
 const INTER_STREAM_DELAY_MS: u64 = 3000;
-const FFPROBE_PREPARATION_MS: u64 = 5000;
+const FFPROBE_PREPARATION_MS: u64 = 7000;
 const FFPROBE_TIMEOUT_MS: u64 = 5000;
 const FFPROBE_MAX_RETRIES: u32 = 3;
 const FFPROBE_RETRY_DELAY_MS: u64 = 3000;
@@ -482,38 +484,69 @@ fn build_vp8_opus_command(width: u16, height: u16, transport: Transport) -> Stri
 
 async fn run_rtsp_cycle_test(config: TestConfig) {
     let server_addr = setup_liveion_server(config.ip, config.server_port).await;
+    let ct = CancellationToken::new();
 
     create_default_stream(&server_addr).await;
 
     // Stream A: ffmpeg → RTSP server → WebRTC
     let stream_a = stream_id("a");
-    start_stream_a(&config, &server_addr, &stream_a).await;
+    let handle_a_whip = start_stream_a_whip(ct.clone(), &config, &server_addr, &stream_a).await;
     wait_for_publish_connected(&server_addr, &stream_a).await;
     tokio::time::sleep(Duration::from_millis(STREAM_STABILIZATION_MS)).await;
 
     // Stream A → RTSP server → Stream B
-    start_stream_a_to_b(&config, &server_addr, &stream_a).await;
+    let handle_a_whep = start_stream_a_whep(ct.clone(), &config, &server_addr, &stream_a).await;
     wait_for_subscribe_connected(&server_addr, &stream_a).await;
     tokio::time::sleep(Duration::from_millis(INTER_STREAM_DELAY_MS)).await;
 
     // Stream B: RTSP client → WebRTC
     let stream_b = stream_id("b");
-    start_stream_b(&config, &server_addr, &stream_b).await;
+    let handle_b_whip = start_stream_b_whip(ct.clone(), &config, &server_addr, &stream_b).await;
     wait_for_publish_connected(&server_addr, &stream_b).await;
 
     // Stream C: Stream B → RTSP server
     let stream_c = stream_id("c");
-    start_stream_b_to_c(&config, &server_addr, &stream_b, &stream_c).await;
+    let handle_c_whip = start_stream_c_whip(ct.clone(), &config, &server_addr, &stream_c).await;
+
+    let handle_b_whep = start_stream_b_whep(ct.clone(), &config, &server_addr, &stream_b).await;
     wait_for_subscribe_connected(&server_addr, &stream_b).await;
     tokio::time::sleep(Duration::from_millis(INTER_STREAM_DELAY_MS)).await;
 
     // Stream C → RTSP server → ffprobe
-    start_stream_c_output(&config, &server_addr, &stream_c).await;
+    let handle_c_whep = start_stream_c_whep(ct.clone(), &config, &server_addr, &stream_c).await;
     wait_for_subscribe_connected(&server_addr, &stream_c).await;
     tokio::time::sleep(Duration::from_millis(FFPROBE_PREPARATION_MS)).await;
 
     // Verify with ffprobe
     verify_stream_with_ffprobe(&config).await;
+
+    ct.cancel();
+
+    match tokio::try_join!(
+        handle_a_whip,
+        handle_a_whep,
+        handle_b_whip,
+        handle_b_whep,
+        handle_c_whip,
+        handle_c_whep
+    ) {
+        Ok((
+            result_a_whip,
+            result_a_whep,
+            result_b_whip,
+            result_b_whep,
+            result_c_whip,
+            result_c_whep,
+        )) => {
+            assert!(result_a_whip.is_ok());
+            assert!(result_a_whep.is_ok());
+            assert!(result_b_whip.is_ok());
+            assert!(result_b_whep.is_ok());
+            assert!(result_c_whip.is_ok());
+            assert!(result_c_whep.is_ok());
+        }
+        Err(e) => panic!("Task panicked with: {:?}", e),
+    };
 }
 
 async fn setup_liveion_server(ip: IpAddr, port: u16) -> SocketAddr {
@@ -549,34 +582,52 @@ async fn create_default_stream(server_addr: &SocketAddr) {
     assert_eq!(1, body.len(), "Expected exactly one default stream");
 }
 
-async fn start_stream_a(config: &TestConfig, server_addr: &SocketAddr, stream_id: &str) {
+async fn start_stream_a_whip(
+    ct: CancellationToken,
+    config: &TestConfig,
+    server_addr: &SocketAddr,
+    stream_id: &str,
+) -> JoinHandle<anyhow::Result<()>> {
     let rtsp_addr = SocketAddr::new(config.ip, config.ports.whip);
     let ffmpeg_cmd = config.ffmpeg_command.replace("{}", &rtsp_addr.to_string());
 
     tokio::spawn(livetwo::whip::into(
+        ct,
         format!("{}://{}", livetwo::SCHEME_RTSP_SERVER, rtsp_addr),
         format!("http://{server_addr}{}", api::path::whip(stream_id)),
         None,
         Some(ffmpeg_cmd),
-    ));
+    ))
 }
 
-async fn start_stream_a_to_b(config: &TestConfig, server_addr: &SocketAddr, stream_id: &str) {
+async fn start_stream_a_whep(
+    ct: CancellationToken,
+    config: &TestConfig,
+    server_addr: &SocketAddr,
+    stream_id: &str,
+) -> JoinHandle<anyhow::Result<()>> {
     let rtsp_addr = SocketAddr::new(config.ip, config.ports.p_ab);
 
     tokio::spawn(livetwo::whep::from(
+        ct,
         format!("{}://{}", livetwo::SCHEME_RTSP_SERVER, rtsp_addr),
         format!("http://{server_addr}{}", api::path::whep(stream_id)),
         None,
         None,
         None,
-    ));
+    ))
 }
 
-async fn start_stream_b(config: &TestConfig, server_addr: &SocketAddr, stream_id: &str) {
+async fn start_stream_b_whip(
+    ct: CancellationToken,
+    config: &TestConfig,
+    server_addr: &SocketAddr,
+    stream_id: &str,
+) -> JoinHandle<anyhow::Result<()>> {
     let rtsp_addr = SocketAddr::new(config.ip, config.ports.p_ab);
 
     tokio::spawn(livetwo::whip::into(
+        ct,
         format!(
             "{}://{}{}",
             livetwo::SCHEME_RTSP_CLIENT,
@@ -586,25 +637,36 @@ async fn start_stream_b(config: &TestConfig, server_addr: &SocketAddr, stream_id
         format!("http://{server_addr}{}", api::path::whip(stream_id)),
         None,
         None,
-    ));
+    ))
 }
 
-async fn start_stream_b_to_c(
+async fn start_stream_c_whip(
+    ct: CancellationToken,
     config: &TestConfig,
     server_addr: &SocketAddr,
-    stream_b_id: &str,
     stream_c_id: &str,
-) {
+) -> JoinHandle<anyhow::Result<()>> {
     let rtsp_addr = SocketAddr::new(config.ip, config.ports.p_bc);
 
     tokio::spawn(livetwo::whip::into(
+        ct.clone(),
         format!("{}://{}", livetwo::SCHEME_RTSP_SERVER, rtsp_addr),
         format!("http://{server_addr}{}", api::path::whip(stream_c_id)),
         None,
         None,
-    ));
+    ))
+}
+
+async fn start_stream_b_whep(
+    ct: CancellationToken,
+    config: &TestConfig,
+    server_addr: &SocketAddr,
+    stream_b_id: &str,
+) -> JoinHandle<anyhow::Result<()>> {
+    let rtsp_addr = SocketAddr::new(config.ip, config.ports.p_bc);
 
     tokio::spawn(livetwo::whep::from(
+        ct,
         format!(
             "{}://{}{}",
             livetwo::SCHEME_RTSP_CLIENT,
@@ -615,19 +677,25 @@ async fn start_stream_b_to_c(
         None,
         None,
         None,
-    ));
+    ))
 }
 
-async fn start_stream_c_output(config: &TestConfig, server_addr: &SocketAddr, stream_id: &str) {
+async fn start_stream_c_whep(
+    ct: CancellationToken,
+    config: &TestConfig,
+    server_addr: &SocketAddr,
+    stream_id: &str,
+) -> JoinHandle<anyhow::Result<()>> {
     let rtsp_addr = SocketAddr::new(config.ip, config.ports.whep);
 
     tokio::spawn(livetwo::whep::from(
+        ct,
         format!("{}://{}", livetwo::SCHEME_RTSP_SERVER, rtsp_addr),
         format!("http://{server_addr}{}", api::path::whep(stream_id)),
         None,
         None,
         None,
-    ));
+    ))
 }
 
 async fn wait_for_publish_connected(server_addr: &SocketAddr, stream_id: &str) {
