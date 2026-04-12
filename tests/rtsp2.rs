@@ -419,10 +419,11 @@ async fn test_livetwo_cycle_rtsp_vp8_opus_tcp() {
 fn build_h264_command(width: u16, height: u16, transport: Transport) -> String {
     format!(
         "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 \
-         -vcodec libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p \
-         -g 15 -keyint_min 15 -b:v 1000k -minrate 1000k -maxrate 1000k \
-         -bufsize 1000k -preset ultrafast -tune zerolatency \
-         -x264-params repeat_headers=1 {} -f rtsp 'rtsp://{{}}'",
+            -vcodec libx264 -pix_fmt yuv420p \
+            -g 30 -keyint_min 30 \
+            -crf 23 -preset ultrafast -tune zerolatency \
+            -profile:v main -level 4.1 \
+            {} -f rtsp 'rtsp://{{}}'",
         transport.as_ffmpeg_flag()
     )
 }
@@ -430,10 +431,11 @@ fn build_h264_command(width: u16, height: u16, transport: Transport) -> String {
 fn build_h265_command(width: u16, height: u16, transport: Transport) -> String {
     format!(
         "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 \
-         -vcodec libx265 -preset ultrafast -tune zerolatency \
-         -x265-params keyint=15:min-keyint=15:bframes=0:repeat-headers=1 \
-         -pix_fmt yuv420p -b:v 1000k -minrate 1000k -maxrate 1000k \
-         -bufsize 1000k {} -f rtsp 'rtsp://{{}}'",
+            -vcodec libx265 -pix_fmt yuv420p \
+            -g 30 -keyint_min 30 \
+            -crf 25 -preset ultrafast -tune zerolatency \
+            -profile:v main -level 4.1 \
+            {} -f rtsp 'rtsp://{{}}'",
         transport.as_ffmpeg_flag()
     )
 }
@@ -441,8 +443,11 @@ fn build_h265_command(width: u16, height: u16, transport: Transport) -> String {
 fn build_vp8_command(width: u16, height: u16, transport: Transport) -> String {
     format!(
         "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 \
-         -vcodec libvpx -pix_fmt yuv420p -b:v 1000k -deadline realtime \
-         {} -f rtsp 'rtsp://{{}}'",
+            -vcodec libvpx -pix_fmt yuv420p \
+            -g 30 -keyint_min 30 \
+            -deadline realtime -speed 4 \
+            -b:v 2000k -maxrate 2500k -bufsize 5000k \
+            {} -f rtsp 'rtsp://{{}}'",
         transport.as_ffmpeg_flag()
     )
 }
@@ -450,16 +455,23 @@ fn build_vp8_command(width: u16, height: u16, transport: Transport) -> String {
 fn build_vp9_command(width: u16, height: u16, transport: Transport) -> String {
     format!(
         "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 \
-         -strict experimental -vcodec libvpx-vp9 -pix_fmt yuv420p \
-         -b:v 1000k -deadline realtime {} -f rtsp 'rtsp://{{}}'",
+            -strict experimental -vcodec libvpx-vp9 -pix_fmt yuv420p \
+            -g 30 -keyint_min 30 \
+            -deadline realtime -speed 5 \
+            -row-mt 1 -tile-columns 2 -frame-parallel 1 \
+            -b:v 1800k -maxrate 2200k -bufsize 4400k \
+            {} -f rtsp 'rtsp://{{}}'",
         transport.as_ffmpeg_flag()
     )
 }
 
 fn build_opus_command(transport: Transport) -> String {
     format!(
-        "ffmpeg -re -f lavfi -i sine=frequency=1000 -acodec libopus \
-         {} -f rtsp 'rtsp://{{}}'",
+        "ffmpeg -re -f lavfi -i sine=frequency=1000
+            -acodec libopus \
+            -ar 48000 -ac 2 -b:a 48k \
+            -application voip -frame_duration 10 -vbr constrained \
+            {} -f rtsp 'rtsp://{{}}'",
         transport.as_ffmpeg_flag()
     )
 }
@@ -476,8 +488,14 @@ fn build_vp8_opus_command(width: u16, height: u16, transport: Transport) -> Stri
     format!(
         "ffmpeg -re -f lavfi -i sine=frequency=1000 \
          -f lavfi -i testsrc=size={width}x{height}:rate=30 \
-         -acodec libopus -vcodec libvpx -pix_fmt yuv420p \
-         -b:v 1000k -deadline realtime {} -f rtsp 'rtsp://{{}}'",
+            -acodec libopus \
+            -ar 48000 -ac 2 -b:a 48k \
+            -application voip -frame_duration 10 -vbr constrained \
+            -vcodec libvpx -pix_fmt yuv420p \
+            -g 30 -keyint_min 30 \
+            -deadline realtime -speed 4 \
+            -b:v 2000k -maxrate 2500k -bufsize 5000k \
+            {} -f rtsp 'rtsp://{{}}'",
         transport.as_ffmpeg_flag()
     )
 }

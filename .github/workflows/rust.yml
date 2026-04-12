@@ -24,12 +24,14 @@ jobs:
           ffprobe -version
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
       - name: Generate code coverage
-        run: cargo llvm-cov --all --lcov --output-path lcov.info
+        run: cargo llvm-cov nextest --all --lcov --output-path lcov.info
       - name: Upload coverage to codecov.io
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6
         with:
-          file: lcov.info
+          files: lcov.info
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -45,7 +47,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v6
       - name: Install pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
       - name: Setup Nodejs
         uses: actions/setup-node@v6
         with:

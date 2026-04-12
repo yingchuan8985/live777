@@ -1,0 +1,14 @@
+[test-groups]
+resource-limited = { max-threads = 4 }
+serial-integration = { max-threads = 1 }
+
+[profile.default]
+retries = { backoff = "exponential", count = 2, delay = "5s", jitter = true }
+
+[[profile.default.overrides]]
+filter = 'not binary(rtsp2)'
+test-group = 'resource-limited'
+
+[[profile.default.overrides]]
+filter = 'binary(rtsp2)'
+test-group = 'serial-integration'
