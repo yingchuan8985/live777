@@ -1,7 +1,9 @@
-use anyhow::Result;
 use std::sync::Arc;
+
+use anyhow::Result;
 use tokio::sync::Notify;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::UnboundedReceiver;
+use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 use crate::protocol;
@@ -55,11 +57,11 @@ impl OutputTarget {
 }
 
 pub async fn setup_output_target(
+    ct: CancellationToken,
     target_url: &str,
     answer_sdp: &str,
     sdp_file: Option<String>,
     codec_info: &rtsp::CodecInfo,
-    complete_tx: UnboundedSender<()>,
     notify: Arc<Notify>,
 ) -> Result<OutputTarget> {
     let input = utils::parse_input_url(target_url)?;
@@ -83,14 +85,9 @@ pub async fn setup_output_target(
     let (media_info, channels, port_update_rx) = match scheme {
         OutputScheme::RtspServer => {
             let port = input.port().unwrap_or(0);
-            let (media_info, channels, port_update_rx) = protocol::rtsp::setup_server_for_pull(
-                &listen_host,
-                port,
-                filtered_sdp,
-                complete_tx,
-                notify,
-            )
-            .await?;
+            let (media_info, channels, port_update_rx) =
+                protocol::rtsp::setup_server_for_pull(ct, &listen_host, port, filtered_sdp, notify)
+                    .await?;
             (media_info, channels, Some(port_update_rx))
         }
         OutputScheme::RtspClient => {

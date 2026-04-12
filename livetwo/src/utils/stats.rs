@@ -1,7 +1,9 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
+
 use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 use webrtc::{
     peer_connection::RTCPeerConnection,
@@ -343,9 +345,9 @@ Rates:
 }
 
 pub async fn start_stats_monitor(
+    ct: CancellationToken,
     peer: Arc<RTCPeerConnection>,
     stats: Arc<RtcpStats>,
-    shutdown: crate::utils::shutdown::ShutdownSignal,
 ) {
     tokio::spawn(async move {
         info!("WebRTC stats monitor started");
@@ -386,7 +388,7 @@ pub async fn start_stats_monitor(
                         }
                     }
                 }
-                _ = shutdown.wait() => {
+                _ = ct.cancelled() => {
                     info!("WebRTC stats monitor shutting down");
                     break;
                 }

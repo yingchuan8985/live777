@@ -2,6 +2,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use tokio::net::TcpListener;
 use tokio::process::Command;
+use tokio_util::sync::CancellationToken;
 
 mod common;
 use common::shutdown_signal;
@@ -83,6 +84,7 @@ async fn test_livetwo_rtsp_h264_tcp() {
     )
     .await;
 }
+
 #[tokio::test]
 async fn test_livetwo_rtsp_h265_udp() {
     let ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
@@ -506,7 +508,9 @@ async fn helper_livetwo_rtsp(
 
     assert_eq!(1, body.len());
 
-    tokio::spawn(livetwo::whip::into(
+    let ct = CancellationToken::new();
+    let handle_whip = tokio::spawn(livetwo::whip::into(
+        ct.clone(),
         format!(
             "{}://{}",
             livetwo::SCHEME_RTSP_SERVER,
@@ -548,7 +552,8 @@ async fn helper_livetwo_rtsp(
     // TODO: publish.state == connected is not ready
     tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
-    tokio::spawn(livetwo::whep::from(
+    let handle_whep = tokio::spawn(livetwo::whep::from(
+        ct.clone(),
         format!(
             "{}://{}",
             livetwo::SCHEME_RTSP_SERVER,
@@ -651,4 +656,12 @@ async fn helper_livetwo_rtsp(
             }
         }
     }
+
+    ct.cancel();
+
+    let result_whip = handle_whip.await.unwrap();
+    let result_whep = handle_whep.await.unwrap();
+
+    assert!(result_whip.is_ok());
+    assert!(result_whep.is_ok());
 }

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::unbounded_channel;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
 use ::webrtc::peer_connection::RTCPeerConnection;
@@ -14,13 +15,14 @@ use libwish::Client;
 use tokio::sync::Notify;
 
 use crate::transport;
-use crate::utils::shutdown::{ShutdownSignal, wait_for_shutdown};
+use crate::utils::shutdown::graceful_shutdown;
 use crate::utils::stats::start_stats_monitor;
 
 pub use output::OutputTarget;
 pub use webrtc::setup_whep_peer;
 
 pub async fn from(
+    ct: CancellationToken,
     target_url: String,
     whep_url: String,
     sdp_file: Option<String>,
@@ -29,10 +31,6 @@ pub async fn from(
 ) -> Result<()> {
     info!("Starting WHEP session: {}", target_url);
 
-    let shutdown = ShutdownSignal::new();
-    let shutdown_clone = shutdown.clone();
-
-    let (complete_tx, complete_rx) = unbounded_channel();
     let (video_send, mut video_recv) = unbounded_channel::<Vec<u8>>();
     let (audio_send, mut audio_recv) = unbounded_channel::<Vec<u8>>();
     let codec_info = Arc::new(tokio::sync::Mutex::new(rtsp::CodecInfo::new()));
@@ -40,19 +38,19 @@ pub async fn from(
     let mut client = Client::new(whep_url.clone(), Client::get_auth_header_map(token.clone()));
 
     let (peer, answer, stats) = webrtc::setup_whep_peer(
+        ct.clone(),
         &mut client,
         video_send,
         audio_send,
-        complete_tx.clone(),
         codec_info.clone(),
     )
     .await?;
     info!("WebRTC peer connection established");
 
-    start_stats_monitor(peer.clone(), stats.clone(), shutdown.clone()).await;
+    start_stats_monitor(ct.clone(), peer.clone(), stats.clone()).await;
 
     let stats_clone = stats.clone();
-    let shutdown_stats = shutdown.clone();
+    let ct_clone = ct.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(10));
 
@@ -62,7 +60,7 @@ pub async fn from(
                     let summary = stats_clone.get_summary().await;
                     info!("{}", summary.format());
                 }
-                _ = shutdown_stats.wait() => {
+                _ = ct_clone.cancelled() => {
                     info!("Stats reporter shutting down");
                     let final_summary = stats_clone.get_summary().await;
                     info!("Final Statistics:\n{}", final_summary.format());
@@ -83,14 +81,14 @@ pub async fn from(
     let audio_broadcast_tx = Arc::new(audio_broadcast_tx);
 
     let video_broadcast_tx_clone = video_broadcast_tx.clone();
-    let shutdown_video = shutdown.clone();
+    let ct_clone = ct.clone();
     tokio::spawn(async move {
         loop {
             tokio::select! {
                 Some(data) = video_recv.recv() => {
                     let _ = video_broadcast_tx_clone.send(data);
                 }
-                _ = shutdown_video.wait() => {
+                _ = ct_clone.cancelled() => {
                     info!("Video broadcast forwarder shutting down");
                     break;
                 }
@@ -99,14 +97,14 @@ pub async fn from(
     });
 
     let audio_broadcast_tx_clone = audio_broadcast_tx.clone();
-    let shutdown_audio = shutdown.clone();
+    let ct_clone = ct.clone();
     tokio::spawn(async move {
         loop {
             tokio::select! {
                 Some(data) = audio_recv.recv() => {
                     let _ = audio_broadcast_tx_clone.send(data);
                 }
-                _ = shutdown_audio.wait() => {
+                _ = ct_clone.cancelled() => {
                     info!("Audio broadcast forwarder shutting down");
                     break;
                 }
@@ -118,17 +116,17 @@ pub async fn from(
     let target_url_clone = target_url.clone();
     let answer_sdp = answer.sdp.clone();
     let codec_info_clone = codec_info.clone();
-    let complete_tx_clone = complete_tx.clone();
     let notify_clone = notify.clone();
     let sdp_file_clone = sdp_file.clone();
 
+    let ct_clone = ct.clone();
     let output_handle = tokio::spawn(async move {
         output::setup_output_target(
+            ct_clone.clone(),
             &target_url_clone,
             &answer_sdp,
             sdp_file_clone,
             &codec_info_clone,
-            complete_tx_clone,
             notify_clone,
         )
         .await
@@ -142,20 +140,19 @@ pub async fn from(
     info!("Output target configured: {:?}", output_target.scheme());
 
     let initial_transport_handle = start_initial_transport_task(
+        ct.clone(),
         1,
         video_broadcast_tx.subscribe(),
         audio_broadcast_tx.subscribe(),
         output_target,
         peer.clone(),
-        shutdown.clone(),
     );
 
     if let Some(mut port_update_rx) = initial_transport_handle.port_update_rx {
         let peer_clone = peer.clone();
         let video_broadcast_tx_clone = video_broadcast_tx.clone();
         let audio_broadcast_tx_clone = audio_broadcast_tx.clone();
-        let shutdown_port = shutdown.clone();
-
+        let ct_clone = ct.clone();
         tokio::spawn(async move {
             let mut transport_handles: Vec<tokio::task::JoinHandle<()>> =
                 vec![initial_transport_handle.task_handle];
@@ -177,12 +174,12 @@ pub async fn from(
                             port_update.connection_id
                         );
                         let handle = start_transport_task(
+                            ct_clone.clone(),
                             port_update.connection_id,
                             video_broadcast_tx_clone.subscribe(),
                             audio_broadcast_tx_clone.subscribe(),
                             port_update.media_info,
                             peer_clone.clone(),
-                            shutdown_port.clone(),
                         );
 
                         transport_handles.push(handle);
@@ -194,7 +191,7 @@ pub async fn from(
                         transport_handles.retain(|h| !h.is_finished());
                         info!("Active transport tasks: {}", transport_handles.len());
                     }
-                    _ = shutdown_port.wait() => {
+                    _ = ct_clone.cancelled() => {
                         info!("Port update listener shutting down");
                         break;
                     }
@@ -204,9 +201,8 @@ pub async fn from(
     }
 
     if child.as_ref().is_some() {
-        let shutdown_child = shutdown.clone();
-        let complete_tx_child = complete_tx.clone();
         let child_clone = child.clone();
+        let ct_clone = ct.clone();
 
         tokio::spawn(async move {
             loop {
@@ -216,13 +212,13 @@ pub async fn from(
                             && let Ok(mut child_guard) = child_mutex.lock()
                                 && let Ok(Some(status)) = child_guard.try_wait() {
                                     info!("Child process exited with status: {:?}", status);
-                                    let _ = complete_tx_child.send(());
+                                    ct_clone.cancel();
                                     break;
                                 }
 
 
                     }
-                    _ = shutdown_child.wait() => {
+                    _ = ct_clone.cancelled() => {
                         info!("Child monitor shutting down");
                         break;
                     }
@@ -231,39 +227,10 @@ pub async fn from(
         });
     }
 
-    let reason = wait_for_shutdown(shutdown_clone, complete_rx).await;
-    info!("Shutting down WHEP session, reason: {}", reason);
-
-    graceful_shutdown(&mut client, peer).await;
+    ct.cancelled().await;
+    graceful_shutdown("WHEP", &mut client, peer).await;
 
     Ok(())
-}
-
-async fn graceful_shutdown(client: &mut Client, peer: Arc<RTCPeerConnection>) {
-    info!("Starting WHEP graceful shutdown");
-
-    let shutdown_timeout = Duration::from_secs(5);
-
-    tokio::select! {
-        _ = async {
-            match client.remove_resource().await {
-                Ok(_) => info!("WHEP resource removed successfully (DELETE sent)"),
-                Err(e) => warn!("Failed to remove WHEP resource: {}", e),
-            }
-
-            match peer.close().await {
-                Ok(_) => info!("PeerConnection closed successfully"),
-                Err(e) => warn!("Failed to close peer connection: {}", e),
-            }
-
-            info!("WebRTC resources cleaned up");
-        } => {
-            info!("WHEP graceful shutdown completed");
-        }
-        _ = tokio::time::sleep(shutdown_timeout) => {
-            warn!("WHEP graceful shutdown timed out after {:?}", shutdown_timeout);
-        }
-    }
 }
 
 struct InitialTransportHandle {
@@ -272,12 +239,12 @@ struct InitialTransportHandle {
 }
 
 fn start_initial_transport_task(
+    ct: CancellationToken,
     connection_id: u32,
     mut video_rx: broadcast::Receiver<Vec<u8>>,
     mut audio_rx: broadcast::Receiver<Vec<u8>>,
     mut output_target: OutputTarget,
     peer: Arc<RTCPeerConnection>,
-    shutdown: ShutdownSignal,
 ) -> InitialTransportHandle {
     let port_update_rx = output_target.take_port_update_rx();
 
@@ -287,7 +254,7 @@ fn start_initial_transport_task(
         let (video_tx, video_rx_unbounded) = unbounded_channel();
         let (audio_tx, audio_rx_unbounded) = unbounded_channel();
 
-        let shutdown_video = shutdown.clone();
+        let ct_clone = ct.clone();
         let video_forwarder = tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -311,7 +278,7 @@ fn start_initial_transport_task(
                             }
                         }
                     }
-                    _ = shutdown_video.wait() => {
+                    _ = ct_clone.cancelled() => {
                         info!("Connection #{} video forwarder shutting down", connection_id);
                         break;
                     }
@@ -319,7 +286,7 @@ fn start_initial_transport_task(
             }
         });
 
-        let shutdown_audio = shutdown.clone();
+        let ct_clone = ct.clone();
         let audio_forwarder = tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -343,7 +310,7 @@ fn start_initial_transport_task(
                             }
                         }
                     }
-                    _ = shutdown_audio.wait() => {
+                    _ = ct_clone.cancelled() => {
                         info!("Connection #{} audio forwarder shutting down", connection_id);
                         break;
                     }
@@ -371,12 +338,12 @@ fn start_initial_transport_task(
 }
 
 fn start_transport_task(
+    ct: CancellationToken,
     connection_id: u32,
     mut video_rx: broadcast::Receiver<Vec<u8>>,
     mut audio_rx: broadcast::Receiver<Vec<u8>>,
     media_info: rtsp::MediaInfo,
     peer: Arc<RTCPeerConnection>,
-    shutdown: ShutdownSignal,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         info!("Transport task #{} started", connection_id);
@@ -384,7 +351,7 @@ fn start_transport_task(
         let (video_tx, video_rx_unbounded) = unbounded_channel();
         let (audio_tx, audio_rx_unbounded) = unbounded_channel();
 
-        let shutdown_video = shutdown.clone();
+        let ct_clone = ct.clone();
         let video_forwarder = tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -408,7 +375,7 @@ fn start_transport_task(
                             }
                         }
                     }
-                    _ = shutdown_video.wait() => {
+                    _ = ct_clone.cancelled() => {
                         info!("Connection #{} video forwarder shutting down", connection_id);
                         break;
                     }
@@ -416,7 +383,7 @@ fn start_transport_task(
             }
         });
 
-        let shutdown_audio = shutdown.clone();
+        let ct_clone = ct.clone();
         let audio_forwarder = tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -440,7 +407,7 @@ fn start_transport_task(
                             }
                         }
                     }
-                    _ = shutdown_audio.wait() => {
+                    _ = ct_clone.cancelled() => {
                         info!("Connection #{} audio forwarder shutting down", connection_id);
                         break;
                     }

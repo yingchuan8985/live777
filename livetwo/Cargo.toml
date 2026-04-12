@@ -13,10 +13,10 @@ crate-type = ["lib"]
 cli = { path = "../libs/cli" }
 rtsp = { path = "../libs/rtsp" }
 libwish = { path = "../libs/libwish" }
-signal = { path = "../libs/signal" }
 
 anyhow = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 tracing = { workspace = true }
 webrtc = { workspace = true }
 sdp = { workspace = true }

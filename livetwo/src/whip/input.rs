@@ -1,5 +1,6 @@
 use anyhow::Result;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::UnboundedReceiver;
+use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 use crate::protocol;
@@ -83,10 +84,7 @@ impl InputSource {
     }
 }
 
-pub async fn setup_input_source(
-    target_url: &str,
-    complete_tx: UnboundedSender<()>,
-) -> Result<InputSource> {
+pub async fn setup_input_source(ct: CancellationToken, target_url: &str) -> Result<InputSource> {
     let input = utils::parse_input_url(target_url)?;
     info!("Processing input URL: {}", input);
 
@@ -103,8 +101,7 @@ pub async fn setup_input_source(
         InputScheme::RtspServer => {
             let video_port = input.port().unwrap_or(0);
             let (media_info, channels, port_update_rx) =
-                protocol::rtsp::setup_server_for_push(&listen_host, video_port, complete_tx)
-                    .await?;
+                protocol::rtsp::setup_server_for_push(ct, &listen_host, video_port).await?;
             (media_info, target_host, channels, Some(port_update_rx))
         }
         InputScheme::RtspClient => {

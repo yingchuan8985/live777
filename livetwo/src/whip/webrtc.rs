@@ -1,7 +1,9 @@
+use std::sync::Arc;
+
 use anyhow::{Result, anyhow};
 use libwish::Client;
-use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 use webrtc::{
     api::{APIBuilder, interceptor_registry::register_default_interceptors, media_engine::*},
@@ -18,9 +20,9 @@ use crate::utils::stats::RtcpStats;
 use crate::whip::track;
 
 pub async fn setup_whip_peer(
+    ct: CancellationToken,
     client: &mut Client,
     media_info: &rtsp::MediaInfo,
-    complete_tx: UnboundedSender<()>,
     input_id: String,
 ) -> Result<(
     Arc<RTCPeerConnection>,
@@ -28,8 +30,7 @@ pub async fn setup_whip_peer(
     Option<UnboundedSender<Vec<u8>>>,
     Arc<RtcpStats>,
 )> {
-    let (peer, video_sender, audio_sender) =
-        create_peer(media_info, complete_tx.clone(), input_id).await?;
+    let (peer, video_sender, audio_sender) = create_peer(ct.clone(), media_info, input_id).await?;
 
     utils::webrtc::setup_connection(peer.clone(), client).await?;
 
@@ -37,7 +38,7 @@ pub async fn setup_whip_peer(
 
     setup_rtcp_listener_for_senders(peer.clone(), stats.clone()).await;
 
-    utils::webrtc::setup_handlers(peer.clone(), complete_tx).await;
+    utils::webrtc::setup_handlers(ct, peer.clone()).await;
 
     Ok((peer, video_sender, audio_sender, stats))
 }
@@ -109,8 +110,8 @@ async fn setup_rtcp_listener_for_senders(peer: Arc<RTCPeerConnection>, stats: Ar
 }
 
 async fn create_peer(
+    ct: CancellationToken,
     media_info: &rtsp::MediaInfo,
-    complete_tx: UnboundedSender<()>,
     input_id: String,
 ) -> Result<(
     Arc<RTCPeerConnection>,
@@ -143,7 +144,7 @@ async fn create_peer(
             .map_err(|error| anyhow!(format!("{:?}: {}", error, error)))?,
     );
 
-    utils::webrtc::setup_handlers(peer.clone(), complete_tx).await;
+    utils::webrtc::setup_handlers(ct, peer.clone()).await;
 
     let video_tx = if let Some(ref video_codec_params) = media_info.video_codec {
         track::setup_video_track(peer.clone(), video_codec_params, input_id.clone()).await?

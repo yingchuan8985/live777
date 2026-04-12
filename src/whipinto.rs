@@ -1,7 +1,10 @@
+use anyhow::Result;
 use clap::{ArgAction, Parser};
-use tracing::Level;
+use tokio_util::sync::CancellationToken;
+use tracing::{Level, info};
 
 mod log;
+mod utils;
 
 #[derive(Parser)]
 #[command(name = "whipinto", version)]
@@ -24,7 +27,7 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let args = Args::parse();
 
     let log_level = match args.verbose {
@@ -35,16 +38,23 @@ async fn main() {
     };
 
     log::set(format!(
-        "livetwo={},rtsp={},webrtc=error",
-        log_level, log_level,
+        "whipinto={},livetwo={},rtsp={},webrtc=error",
+        log_level, log_level, log_level,
     ));
 
-    livetwo::whip::into(
+    let ct = CancellationToken::new();
+    let handle = tokio::spawn(livetwo::whip::into(
+        ct.clone(),
         args.input.clone(),
         args.whip.clone(),
         args.token.clone(),
         args.command.clone(),
-    )
-    .await
-    .unwrap();
+    ));
+
+    utils::shutdown_signal().await;
+    ct.cancel();
+    handle.await??;
+    info!("=== Graceful shutdown completed ===");
+
+    Ok(())
 }
