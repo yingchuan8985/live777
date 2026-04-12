@@ -113,7 +113,7 @@ impl Default for Log {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct Channel {
     /// Per-stream channel configuration, keyed by stream name.
     /// URL format: udp://<listen_addr>:<listen_port>?host=<target_host>&port=<target_port>
@@ -132,20 +132,31 @@ pub struct ChannelStream {
 }
 
 impl ChannelStream {
-    /// Parse the URL into (listen_addr, listen_port, target_host, target_port).
-    /// Supported format: udp://<listen_addr>:<listen_port>?host=<target_host>&port=<target_port>
+    /// Parse the URL into (listen_host, listen_port, target_host, target_port).
+    /// Supported format: udp://<listen_host>:<listen_port>?host=<target_host>&port=<target_port>
     pub fn parse(&self) -> Option<(String, u16, String, u16)> {
         let url = url::Url::parse(&self.url).ok()?;
         if url.scheme() != "udp" {
             return None;
         }
-        let listen_addr = url.host_str()?.to_string();
+        // url::Host formats IPv4 as "1.2.3.4", IPv6 as "[::1]", Domain as "example.com"
+        let listen_host = match url.host()? {
+            url::Host::Ipv6(addr) => format!("[{}]", addr),
+            host => host.to_string(),
+        };
         let listen_port = url.port()?;
         let mut target_host = String::new();
         let mut target_port: u16 = 0;
         for (key, value) in url.query_pairs() {
             match key.as_ref() {
-                "host" => target_host = value.into_owned(),
+                "host" => {
+                    // Wrap IPv6 addresses in brackets for use as socket address
+                    target_host = if value.parse::<std::net::Ipv6Addr>().is_ok() {
+                        format!("[{}]", value)
+                    } else {
+                        value.into_owned()
+                    };
+                }
                 "port" => target_port = value.parse().ok()?,
                 _ => {}
             }
@@ -153,16 +164,67 @@ impl ChannelStream {
         if target_host.is_empty() || target_port == 0 {
             return None;
         }
-        Some((listen_addr, listen_port, target_host, target_port))
+        Some((listen_host, listen_port, target_host, target_port))
     }
 }
 
-impl Default for Channel {
-    fn default() -> Self {
-        Self { streams: std::collections::HashMap::new() }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_channel_stream_parse_ipv4() {
+        let s = ChannelStream {
+            url: "udp://0.0.0.0:7774?host=127.0.0.1&port=1234".to_string(),
+        };
+        let (listen_host, listen_port, target_host, target_port) = s.parse().unwrap();
+        assert_eq!(listen_host, "0.0.0.0");
+        assert_eq!(listen_port, 7774);
+        assert_eq!(target_host, "127.0.0.1");
+        assert_eq!(target_port, 1234);
+    }
+
+    #[test]
+    fn test_channel_stream_parse_ipv6() {
+        let s = ChannelStream {
+            url: "udp://[::]:7774?host=::1&port=1234".to_string(),
+        };
+        let (listen_host, listen_port, target_host, target_port) = s.parse().unwrap();
+        assert_eq!(listen_host, "[::]");
+        assert_eq!(listen_port, 7774);
+        assert_eq!(target_host, "[::1]");
+        assert_eq!(target_port, 1234);
+    }
+
+    #[test]
+    fn test_channel_stream_parse_domain() {
+        let s = ChannelStream {
+            url: "udp://localhost:7774?host=example.com&port=1234".to_string(),
+        };
+        let (listen_host, listen_port, target_host, target_port) = s.parse().unwrap();
+        assert_eq!(listen_host, "localhost");
+        assert_eq!(listen_port, 7774);
+        assert_eq!(target_host, "example.com");
+        assert_eq!(target_port, 1234);
+    }
+
+    #[test]
+    fn test_channel_stream_parse_invalid_scheme() {
+        let s = ChannelStream {
+            url: "tcp://0.0.0.0:7774?host=127.0.0.1&port=1234".to_string(),
+        };
+        assert!(s.parse().is_none());
+    }
+
+    #[test]
+    fn test_channel_stream_parse_missing_target() {
+        let s = ChannelStream {
+            url: "udp://0.0.0.0:7774".to_string(),
+        };
+        assert!(s.parse().is_none());
     }
 }
-
 
 fn default_log_level() -> String {
     env::var("LOG_LEVEL").unwrap_or_else(|_| {

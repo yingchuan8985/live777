@@ -64,11 +64,11 @@ pub(crate) struct PeerForwardInternal {
     data_channel_forward: DataChannelForward,
     ice_server: Vec<RTCIceServer>,
     event_sender: broadcast::Sender<ForwardEvent>,
-    ptz_udp: Channel,
+    channel: Channel,
 }
 
 impl PeerForwardInternal {
-    pub(crate) fn new(stream: impl ToString, ice_server: Vec<RTCIceServer>, ptz_udp: Channel) -> Self {
+    pub(crate) fn new(stream: impl ToString, ice_server: Vec<RTCIceServer>, channel: Channel) -> Self {
         PeerForwardInternal {
             stream: stream.to_string(),
             create_at: Utc::now().timestamp_millis(),
@@ -85,7 +85,7 @@ impl PeerForwardInternal {
             },
             ice_server,
             event_sender: new_broadcast_channel!(16),
-            ptz_udp,
+            channel,
         }
     }
 
@@ -469,14 +469,14 @@ impl PeerForwardInternal {
         // Messages from the WHIP publisher arrive on the subscribe channel.
         let dc_rx = self.data_channel_forward.subscribe.subscribe();
         let dc_tx = self.data_channel_forward.publish.clone();
-        let stream_cfg = self.ptz_udp.streams.get(&self.stream).cloned();
+        let stream_cfg = self.channel.streams.get(&self.stream).cloned();
         super::channel::spawn_channel(
             self.stream.clone(),
             dc_rx,
             dc_tx,
             stream_cfg,
         )
-        .await;
+        .await?;
         Self::data_channel_forward(dc, sender, receiver).await;
         Ok(())
     }
