@@ -21,7 +21,6 @@
     "preview:livecam": "pnpm --filter livecam preview",
     "check": "biome check",
     "lint": "eslint && tsc --noEmit",
-    "e2e:cluster": "vitest",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"
@@ -51,7 +50,6 @@
     "typescript-eslint": "^8.46.3",
     "vite": "^7.2.0",
     "vite-plugin-solid": "^2.11.10",
-    "vitepress": "^1.6.4",
-    "vitest": "^4.0.7"
+    "vitepress": "^1.6.4"
   }
 }
