@@ -35,11 +35,10 @@ async fn test_livetwo_rtsp_h264_udp() {
     let whip_port: u16 = 8530;
     let whep_port: u16 = 8535;
 
-    let width = 640;
-    let height = 480;
-    let prefix = format!(
-        "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -vcodec libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -g 15 -keyint_min 15 -b:v 1000k -minrate 1000k -maxrate 1000k -bufsize 1000k -preset ultrafast -tune zerolatency -x264-params repeat_headers=1"
-    );
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libx264 -pix_fmt yuv420p -g 30 -keyint_min 30 -crf 23 -preset ultrafast -tune zerolatency -profile:v main -level 4.1";
+    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {vcodec}");
 
     helper_livetwo_rtsp(
         ip,
@@ -64,11 +63,10 @@ async fn test_livetwo_rtsp_h264_tcp() {
     let whip_port: u16 = 8540;
     let whep_port: u16 = 8545;
 
-    let width = 640;
-    let height = 480;
-    let prefix = format!(
-        "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -vcodec libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -g 15 -keyint_min 15 -b:v 1000k -minrate 1000k -maxrate 1000k -bufsize 1000k -preset ultrafast -tune zerolatency -x264-params repeat_headers=1"
-    );
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libx264 -pix_fmt yuv420p -g 30 -keyint_min 30 -crf 23 -preset ultrafast -tune zerolatency -profile:v main -level 4.1";
+    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {vcodec}");
 
     helper_livetwo_rtsp(
         ip,
@@ -93,11 +91,10 @@ async fn test_livetwo_rtsp_h265_udp() {
     let whip_port: u16 = 8670;
     let whep_port: u16 = 8675;
 
-    let width = 640;
-    let height = 480;
-    let prefix = format!(
-        "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -vcodec libx265 -preset ultrafast -tune zerolatency -x265-params keyint=15:min-keyint=15:bframes=0:repeat-headers=1 -pix_fmt yuv420p -b:v 1000k -minrate 1000k -maxrate 1000k -bufsize 1000k"
-    );
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libx265 -pix_fmt yuv420p -g 30 -keyint_min 30 -crf 25 -preset ultrafast -tune zerolatency -profile:v main -level 4.1";
+    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {vcodec}");
 
     helper_livetwo_rtsp(
         ip,
@@ -122,11 +119,10 @@ async fn test_livetwo_rtsp_h265_tcp() {
     let whip_port: u16 = 8680;
     let whep_port: u16 = 8685;
 
-    let width = 640;
-    let height = 480;
-    let prefix = format!(
-        "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -vcodec libx265 -preset ultrafast -tune zerolatency -x265-params keyint=15:min-keyint=15:bframes=0:repeat-headers=1 -pix_fmt yuv420p -b:v 1000k -minrate 1000k -maxrate 1000k -bufsize 1000k -rtsp_transport tcp"
-    );
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libx265 -pix_fmt yuv420p -g 30 -keyint_min 30 -crf 25 -preset ultrafast -tune zerolatency -profile:v main -level 4.1";
+    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {vcodec}");
 
     helper_livetwo_rtsp(
         ip,
@@ -151,10 +147,10 @@ async fn test_livetwo_rtsp_vp8_udp() {
     let whip_port: u16 = 8550;
     let whep_port: u16 = 8555;
 
-    let width = 640;
-    let height = 480;
-    let prefix =
-        format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -vcodec libvpx");
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libvpx -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 4 -b:v 2000k -maxrate 2500k -bufsize 5000k";
+    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {vcodec}");
 
     helper_livetwo_rtsp(
         ip,
@@ -179,10 +175,10 @@ async fn test_livetwo_rtsp_vp8_tcp() {
     let whip_port: u16 = 8560;
     let whep_port: u16 = 8565;
 
-    let width = 640;
-    let height = 480;
-    let prefix =
-        format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -vcodec libvpx");
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libvpx -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 4 -b:v 2000k -maxrate 2500k -bufsize 5000k";
+    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {vcodec}");
 
     helper_livetwo_rtsp(
         ip,
@@ -207,10 +203,10 @@ async fn test_livetwo_rtsp_vp8_ipv6_udp() {
     let whip_port: u16 = 8570;
     let whep_port: u16 = 8575;
 
-    let width = 640;
-    let height = 480;
-    let prefix =
-        format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -vcodec libvpx");
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libvpx -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 4 -b:v 2000k -maxrate 2500k -bufsize 5000k";
+    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {vcodec}");
 
     helper_livetwo_rtsp(
         ip,
@@ -235,10 +231,11 @@ async fn test_livetwo_rtsp_vp8_ipv6_tcp() {
     let whip_port: u16 = 8580;
     let whep_port: u16 = 8585;
 
-    let width = 640;
-    let height = 480;
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libvpx -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 4 -b:v 2000k -maxrate 2500k -bufsize 5000k";
     let prefix = format!(
-        "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -vcodec libvpx -rtsp_transport tcp"
+        "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {vcodec} -rtsp_transport tcp"
     );
 
     helper_livetwo_rtsp(
@@ -264,10 +261,12 @@ async fn test_livetwo_rtsp_vp9_udp() {
     let whip_port: u16 = 8590;
     let whep_port: u16 = 8595;
 
-    let width = 640;
-    let height = 480;
-    let codec = "-strict experimental -vcodec libvpx-vp9 -pix_fmt yuv420p";
-    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {codec}");
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libvpx-vp9 -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 5 -row-mt 1 -tile-columns 2 -frame-parallel 1 -b:v 1800k -maxrate 2200k -bufsize 4400k";
+    let prefix = format!(
+        "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -strict experimental {vcodec}"
+    );
 
     helper_livetwo_rtsp(
         ip,
@@ -292,11 +291,11 @@ async fn test_livetwo_rtsp_vp9_tcp() {
     let whip_port: u16 = 8600;
     let whep_port: u16 = 8605;
 
-    let width = 640;
-    let height = 480;
-    let codec = "-strict experimental -vcodec libvpx-vp9 -pix_fmt yuv420p";
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libvpx-vp9 -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 5 -row-mt 1 -tile-columns 2 -frame-parallel 1 -b:v 1800k -maxrate 2200k -bufsize 4400k";
     let prefix = format!(
-        "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {codec} -rtsp_transport tcp"
+        "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -strict experimental {vcodec} -rtsp_transport tcp"
     );
 
     helper_livetwo_rtsp(
@@ -322,8 +321,8 @@ async fn test_livetwo_rtsp_opus_udp() {
     let whip_port: u16 = 8610;
     let whep_port: u16 = 8615;
 
-    let codec = "-acodec libopus";
-    let prefix = format!("ffmpeg -re -f lavfi -i sine=frequency=1000 {codec}");
+    let acodec = "-acodec libopus -ar 48000 -ac 2 -b:a 48k -application voip -frame_duration 10 -vbr constrained";
+    let prefix = format!("ffmpeg -re -f lavfi -i sine=frequency=1000 {acodec}");
 
     helper_livetwo_rtsp(
         ip,
@@ -348,8 +347,8 @@ async fn test_livetwo_rtsp_opus_tcp() {
     let whip_port: u16 = 8620;
     let whep_port: u16 = 8625;
 
-    let codec = "-acodec libopus";
-    let prefix = format!("ffmpeg -re -f lavfi -i sine=frequency=1000 {codec} -rtsp_transport tcp");
+    let acodec = "-acodec libopus -ar 48000 -ac 2 -b:a 48k -application voip -frame_duration 10 -vbr constrained";
+    let prefix = format!("ffmpeg -re -f lavfi -i sine=frequency=1000 {acodec} -rtsp_transport tcp");
 
     helper_livetwo_rtsp(
         ip,
@@ -374,8 +373,8 @@ async fn test_livetwo_rtsp_g722_udp() {
     let whip_port: u16 = 8630;
     let whep_port: u16 = 8635;
 
-    let codec = "-acodec g722";
-    let prefix = format!("ffmpeg -re -f lavfi -i sine=frequency=1000 {codec}");
+    let acodec = "-acodec g722";
+    let prefix = format!("ffmpeg -re -f lavfi -i sine=frequency=1000 {acodec}");
 
     helper_livetwo_rtsp(
         ip,
@@ -400,8 +399,8 @@ async fn test_livetwo_rtsp_g722_tcp() {
     let whip_port: u16 = 8640;
     let whep_port: u16 = 8645;
 
-    let codec = "-acodec g722";
-    let prefix = format!("ffmpeg -re -f lavfi -i sine=frequency=1000 {codec} -rtsp_transport tcp");
+    let acodec = "-acodec g722";
+    let prefix = format!("ffmpeg -re -f lavfi -i sine=frequency=1000 {acodec} -rtsp_transport tcp");
 
     helper_livetwo_rtsp(
         ip,
@@ -426,10 +425,13 @@ async fn test_livetwo_rtsp_vp8_opus_udp() {
     let whip_port: u16 = 8650;
     let whep_port: u16 = 8655;
 
-    let width = 640;
-    let height = 480;
+    let width = 1280;
+    let height = 720;
+
+    let acodec = "-acodec libopus -ar 48000 -ac 2 -b:a 48k -application voip -frame_duration 10 -vbr constrained";
+    let vcodec = "-vcodec libvpx -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 4 -b:v 2000k -maxrate 2500k -bufsize 5000k";
     let prefix = format!(
-        "ffmpeg -re -f lavfi -i sine=frequency=1000 -f lavfi -i testsrc=size={width}x{height}:rate=30 -acodec libopus -vcodec libvpx"
+        "ffmpeg -re -f lavfi -i sine=frequency=1000 -f lavfi -i testsrc=size={width}x{height}:rate=30 {acodec} {vcodec}"
     );
 
     helper_livetwo_rtsp(
@@ -455,10 +457,13 @@ async fn test_livetwo_rtsp_vp8_opus_tcp() {
     let whip_port: u16 = 8660;
     let whep_port: u16 = 8665;
 
-    let width = 640;
-    let height = 480;
+    let width = 1280;
+    let height = 720;
+
+    let acodec = "-acodec libopus -ar 48000 -ac 2 -b:a 48k -application voip -frame_duration 10 -vbr constrained";
+    let vcodec = "-vcodec libvpx -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 4 -b:v 2000k -maxrate 2500k -bufsize 5000k";
     let prefix = format!(
-        "ffmpeg -re -f lavfi -i sine=frequency=1000 -f lavfi -i testsrc=size={width}x{height}:rate=30 -acodec libopus -vcodec libvpx -rtsp_transport tcp"
+        "ffmpeg -re -f lavfi -i sine=frequency=1000 -f lavfi -i testsrc=size={width}x{height}:rate=30 {acodec} {vcodec} -rtsp_transport tcp"
     );
 
     helper_livetwo_rtsp(

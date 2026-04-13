@@ -37,11 +37,11 @@ Video Test Src
 
 ```bash
 # send RTP and Create SDP file
-ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec libx264 \
+ffmpeg -re -f lavfi -i testsrc=size=1280x720:rate=30 \
+-vcodec libx264 -pix_fmt yuv420p \
+-g 60 -keyint_min 60 -crf 23 \
 -preset ultrafast -tune zerolatency \
--profile:v baseline -level 3.0 -pix_fmt yuv420p \
--g 30 -keyint_min 30 -b:v 1000k \
--minrate 1000k -maxrate 1000k -bufsize 1000k \
+-profile:v main -level 4.1 \
 -f rtp 'rtp://127.0.0.1:5002' -sdp_file input.sdp
 ```
 
@@ -68,29 +68,28 @@ For ffplay. You Need a sdp file
 ffplay -protocol_whitelist rtp,file,udp -i output.sdp
 ```
 
-
 ### X264 WHIP
 
 ```bash
 docker run --rm --network host \
 ghcr.io/binbat/ffmpeg:latest \
 \
-ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 \
--vcodec libx264 -profile:v baseline -level 3.0 \
--pix_fmt yuv420p -g 30 -keyint_min 30 \
--b:v 1000k -minrate 1000k -maxrate 1000k \
--bufsize 1000k -preset ultrafast -tune zerolatency \
+ffmpeg -re -f lavfi -i testsrc=size=1280x720:rate=30 \
+-vcodec libx264 -pix_fmt yuv420p \
+-g 60 -keyint_min 60 -crf 23 \
+-preset ultrafast -tune zerolatency \
+-profile:v main -level 4.1 \
 -f whip http://localhost:7777/whip/777
 ```
 
 ## H265
 
 ```bash
-ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec libx265 \
+ffmpeg -re -f lavfi -i testsrc=size=1280x720:rate=30 \
+-vcodec libx265 -pix_fmt yuv420p \
+-g 60 -keyint_min 60 -crf 25 \
 -preset ultrafast -tune zerolatency \
--x265-params keyint=30:min-keyint=30:bframes=0:repeat-headers=1 \
--pix_fmt yuv420p \
--b:v 1000k -minrate 1000k -maxrate 1000k -bufsize 1000k \
+-profile:v main -level 4.1 \
 -f rtp 'rtp://127.0.0.1:5002' -sdp_file input.sdp
 ```
 
@@ -116,8 +115,12 @@ ffmpeg -re -f lavfi -i testsrc=size=640x360:rate=30 -pix_fmt yuv420p \
 ## VP8
 
 ```bash
-ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 \
--vcodec libvpx -f rtp 'rtp://127.0.0.1:5002' -sdp_file input.sdp
+ffmpeg -re -f lavfi -i testsrc=size=1280x720:rate=30 \
+-vcodec libvpx -pix_fmt yuv420p \
+-g 60 -keyint_min 60 \
+-deadline realtime -speed 4 \
+-b:v 2000k -maxrate 2500k -bufsize 5000k \
+-f rtp 'rtp://127.0.0.1:5002' -sdp_file input.sdp
 ```
 
 ```bash
@@ -131,8 +134,12 @@ Packetizing VP9 is experimental and its specification is still in draft state. P
 :::
 
 ```bash
-ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 \
+ffmpeg -re -f lavfi -i testsrc=size=1280x720:rate=30 \
 -strict experimental -vcodec libvpx-vp9 -pix_fmt yuv420p \
+-g 60 -keyint_min 60 \
+-deadline realtime -speed 5 \
+-row-mt 1 -tile-columns 2 -frame-parallel 1 \
+-b:v 1800k -maxrate 2200k -bufsize 4400k \
 -f rtp 'rtp://127.0.0.1:5002' -sdp_file input.sdp
 ```
 
@@ -150,7 +157,11 @@ whipinto -i input.sdp -w http://localhost:7777/whip/777
 
 ```bash
 ffmpeg -re -f lavfi -i sine=frequency=1000 \
--acodec libopus -f rtp 'rtp://127.0.0.1:5004'
+-acodec libopus \
+-ar 48000 -ac 2 \
+-b:a 48k -application voip \
+-frame_duration 10 -vbr constrained \
+-f rtp 'rtp://127.0.0.1:5004'
 ```
 
 ### OPUS WHIP
@@ -178,7 +189,7 @@ ffmpeg -re -f lavfi -i sine=frequency=1000 \
 ```bash
 ffmpeg -re \
 -f lavfi -i sine=frequency=1000 \
--f lavfi -i testsrc=size=640x480:rate=30 \
+-f lavfi -i testsrc=size=1280x720:rate=30 \
 -acodec libopus -vn -f rtp rtp://127.0.0.1:5002 \
 -vcodec libvpx -an -f rtp rtp://127.0.0.1:5004 -sdp_file input.sdp
 ```
@@ -188,11 +199,13 @@ ffmpeg -re \
 ```bash
 ffmpeg -re \
 -f lavfi -i sine=frequency=1000 \
--f lavfi -i testsrc=size=640x480:rate=30 \
+-f lavfi -i testsrc=size=1280x720:rate=30 \
 -acodec g722 -vn -f rtp rtp://127.0.0.1:5002 \
--vcodec libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p \
--g 30 -keyint_min 30 -b:v 1000k -minrate 1000k -maxrate 1000k -bufsize 1000k \
--preset ultrafast -tune zerolatency -an -f rtp rtp://127.0.0.1:5004 \
+-vcodec libx264 -pix_fmt yuv420p \
+-g 60 -keyint_min 60 -crf 23 \
+-preset ultrafast -tune zerolatency \
+-profile:v main -level 4.1 \
+-an -f rtp rtp://127.0.0.1:5004 \
 -sdp_file input.sdp
 ```
 
@@ -204,12 +217,12 @@ ghcr.io/binbat/ffmpeg:latest \
 \
 ffmpeg -re \
 -f lavfi -i sine=frequency=1000 \
--f lavfi -i testsrc=size=640x480:rate=30 \
+-f lavfi -i testsrc=size=1280x720:rate=30 \
 -ac 2 -ar 48000 -acodec libopus \
--vcodec libx264 -profile:v baseline -level 3.0 \
--pix_fmt yuv420p -g 30 -keyint_min 30 \
--b:v 1000k -minrate 1000k -maxrate 1000k \
--bufsize 1000k -preset ultrafast -tune zerolatency \
+-vcodec libx264 -pix_fmt yuv420p \
+-g 60 -keyint_min 60 -crf 23 \
+-preset ultrafast -tune zerolatency \
+-profile:v main -level 4.1 \
 -f whip http://localhost:7777/whip/777
 ```
 

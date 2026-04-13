@@ -91,10 +91,10 @@ async fn test_livetwo_cycle_rtsp_h264_udp() {
             p_bc: 8020,
             whep: 8030,
         },
-        ffmpeg_command: build_h264_command(640, 480, Transport::Udp),
+        ffmpeg_command: build_h264_command(1280, 720, Transport::Udp),
         media: MediaExpectation {
             audio_channels: None,
-            video_resolution: Some((640, 480)),
+            video_resolution: Some((1280, 720)),
         },
         transport: Transport::Udp,
     })
@@ -112,10 +112,10 @@ async fn test_livetwo_cycle_rtsp_h264_tcp() {
             p_bc: 7370,
             whep: 7375,
         },
-        ffmpeg_command: build_h264_command(640, 480, Transport::Tcp),
+        ffmpeg_command: build_h264_command(1280, 720, Transport::Tcp),
         media: MediaExpectation {
             audio_channels: None,
-            video_resolution: Some((640, 480)),
+            video_resolution: Some((1280, 720)),
         },
         transport: Transport::Tcp,
     })
@@ -133,10 +133,10 @@ async fn test_livetwo_cycle_rtsp_h265_udp() {
             p_bc: 7170,
             whep: 7175,
         },
-        ffmpeg_command: build_h265_command(640, 480, Transport::Udp),
+        ffmpeg_command: build_h265_command(1280, 720, Transport::Udp),
         media: MediaExpectation {
             audio_channels: None,
-            video_resolution: Some((640, 480)),
+            video_resolution: Some((1280, 720)),
         },
         transport: Transport::Udp,
     })
@@ -154,10 +154,10 @@ async fn test_livetwo_cycle_rtsp_h265_tcp() {
             p_bc: 7390,
             whep: 7395,
         },
-        ffmpeg_command: build_h265_command(640, 480, Transport::Tcp),
+        ffmpeg_command: build_h265_command(1280, 720, Transport::Tcp),
         media: MediaExpectation {
             audio_channels: None,
-            video_resolution: Some((640, 480)),
+            video_resolution: Some((1280, 720)),
         },
         transport: Transport::Tcp,
     })
@@ -175,10 +175,10 @@ async fn test_livetwo_cycle_rtsp_vp8_udp() {
             p_bc: 7030,
             whep: 7035,
         },
-        ffmpeg_command: build_vp8_command(640, 480, Transport::Udp),
+        ffmpeg_command: build_vp8_command(1280, 720, Transport::Udp),
         media: MediaExpectation {
             audio_channels: None,
-            video_resolution: Some((640, 480)),
+            video_resolution: Some((1280, 720)),
         },
         transport: Transport::Udp,
     })
@@ -196,10 +196,10 @@ async fn test_livetwo_cycle_rtsp_vp8_tcp() {
             p_bc: 7230,
             whep: 7235,
         },
-        ffmpeg_command: build_vp8_command(640, 480, Transport::Tcp),
+        ffmpeg_command: build_vp8_command(1280, 720, Transport::Tcp),
         media: MediaExpectation {
             audio_channels: None,
-            video_resolution: Some((640, 480)),
+            video_resolution: Some((1280, 720)),
         },
         transport: Transport::Tcp,
     })
@@ -217,10 +217,10 @@ async fn test_livetwo_cycle_rtsp_vp8_ipv6_udp() {
             p_bc: 7050,
             whep: 7055,
         },
-        ffmpeg_command: build_vp8_command(640, 480, Transport::Udp),
+        ffmpeg_command: build_vp8_command(1280, 720, Transport::Udp),
         media: MediaExpectation {
             audio_channels: None,
-            video_resolution: Some((640, 480)),
+            video_resolution: Some((1280, 720)),
         },
         transport: Transport::Udp,
     })
@@ -238,10 +238,10 @@ async fn test_livetwo_cycle_rtsp_vp8_ipv6_tcp() {
             p_bc: 7250,
             whep: 7255,
         },
-        ffmpeg_command: build_vp8_command(640, 480, Transport::Tcp),
+        ffmpeg_command: build_vp8_command(1280, 720, Transport::Tcp),
         media: MediaExpectation {
             audio_channels: None,
-            video_resolution: Some((640, 480)),
+            video_resolution: Some((1280, 720)),
         },
         transport: Transport::Tcp,
     })
@@ -259,10 +259,10 @@ async fn test_livetwo_cycle_rtsp_vp9_udp() {
             p_bc: 7070,
             whep: 7075,
         },
-        ffmpeg_command: build_vp9_command(640, 480, Transport::Udp),
+        ffmpeg_command: build_vp9_command(1280, 720, Transport::Udp),
         media: MediaExpectation {
             audio_channels: None,
-            video_resolution: Some((640, 480)),
+            video_resolution: Some((1280, 720)),
         },
         transport: Transport::Udp,
     })
@@ -280,10 +280,10 @@ async fn test_livetwo_cycle_rtsp_vp9_tcp() {
             p_bc: 7270,
             whep: 7275,
         },
-        ffmpeg_command: build_vp9_command(640, 480, Transport::Tcp),
+        ffmpeg_command: build_vp9_command(1280, 720, Transport::Tcp),
         media: MediaExpectation {
             audio_channels: None,
-            video_resolution: Some((640, 480)),
+            video_resolution: Some((1280, 720)),
         },
         transport: Transport::Tcp,
     })
@@ -385,10 +385,10 @@ async fn test_livetwo_cycle_rtsp_vp8_opus_udp() {
             p_bc: 7150,
             whep: 7155,
         },
-        ffmpeg_command: build_vp8_opus_command(640, 480, Transport::Udp),
+        ffmpeg_command: build_vp8_opus_command(1280, 720, Transport::Udp),
         media: MediaExpectation {
             audio_channels: Some(2),
-            video_resolution: Some((640, 480)),
+            video_resolution: Some((1280, 720)),
         },
         transport: Transport::Udp,
     })
@@ -406,10 +406,10 @@ async fn test_livetwo_cycle_rtsp_vp8_opus_tcp() {
             p_bc: 7350,
             whep: 7355,
         },
-        ffmpeg_command: build_vp8_opus_command(640, 480, Transport::Tcp),
+        ffmpeg_command: build_vp8_opus_command(1280, 720, Transport::Tcp),
         media: MediaExpectation {
             audio_channels: Some(2),
-            video_resolution: Some((640, 480)),
+            video_resolution: Some((1280, 720)),
         },
         transport: Transport::Tcp,
     })
@@ -417,60 +417,50 @@ async fn test_livetwo_cycle_rtsp_vp8_opus_tcp() {
 }
 
 fn build_h264_command(width: u16, height: u16, transport: Transport) -> String {
+    let vcodec = "-vcodec libx264 -pix_fmt yuv420p -g 30 -keyint_min 30 -crf 23 -preset ultrafast -tune zerolatency -profile:v main -level 4.1";
     format!(
         "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 \
-            -vcodec libx264 -pix_fmt yuv420p \
-            -g 30 -keyint_min 30 \
-            -crf 23 -preset ultrafast -tune zerolatency \
-            -profile:v main -level 4.1 \
+            {vcodec} \
             {} -f rtsp 'rtsp://{{}}'",
         transport.as_ffmpeg_flag()
     )
 }
 
 fn build_h265_command(width: u16, height: u16, transport: Transport) -> String {
+    let vcodec = "-vcodec libx265 -pix_fmt yuv420p -g 30 -keyint_min 30 -crf 25 -preset ultrafast -tune zerolatency -profile:v main -level 4.1";
     format!(
         "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 \
-            -vcodec libx265 -pix_fmt yuv420p \
-            -g 30 -keyint_min 30 \
-            -crf 25 -preset ultrafast -tune zerolatency \
-            -profile:v main -level 4.1 \
+            {vcodec} \
             {} -f rtsp 'rtsp://{{}}'",
         transport.as_ffmpeg_flag()
     )
 }
 
 fn build_vp8_command(width: u16, height: u16, transport: Transport) -> String {
+    let vcodec = "-vcodec libvpx -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 4 -b:v 2000k -maxrate 2500k -bufsize 5000k";
     format!(
         "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 \
-            -vcodec libvpx -pix_fmt yuv420p \
-            -g 30 -keyint_min 30 \
-            -deadline realtime -speed 4 \
-            -b:v 2000k -maxrate 2500k -bufsize 5000k \
+            {vcodec} \
             {} -f rtsp 'rtsp://{{}}'",
         transport.as_ffmpeg_flag()
     )
 }
 
 fn build_vp9_command(width: u16, height: u16, transport: Transport) -> String {
+    let vcodec = "-vcodec libvpx-vp9 -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 5 -row-mt 1 -tile-columns 2 -frame-parallel 1 -b:v 1800k -maxrate 2200k -bufsize 4400k";
     format!(
         "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 \
-            -strict experimental -vcodec libvpx-vp9 -pix_fmt yuv420p \
-            -g 30 -keyint_min 30 \
-            -deadline realtime -speed 5 \
-            -row-mt 1 -tile-columns 2 -frame-parallel 1 \
-            -b:v 1800k -maxrate 2200k -bufsize 4400k \
+            -strict experimental {vcodec} \
             {} -f rtsp 'rtsp://{{}}'",
         transport.as_ffmpeg_flag()
     )
 }
 
 fn build_opus_command(transport: Transport) -> String {
+    let acodec = "-acodec libopus -ar 48000 -ac 2 -b:a 48k -application voip -frame_duration 10 -vbr constrained";
     format!(
         "ffmpeg -re -f lavfi -i sine=frequency=1000
-            -acodec libopus \
-            -ar 48000 -ac 2 -b:a 48k \
-            -application voip -frame_duration 10 -vbr constrained \
+            {acodec} \
             {} -f rtsp 'rtsp://{{}}'",
         transport.as_ffmpeg_flag()
     )
@@ -485,16 +475,13 @@ fn build_g722_command(transport: Transport) -> String {
 }
 
 fn build_vp8_opus_command(width: u16, height: u16, transport: Transport) -> String {
+    let acodec = "-acodec libopus -ar 48000 -ac 2 -b:a 48k -application voip -frame_duration 10 -vbr constrained";
+    let vcodec = "-vcodec libvpx -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 4 -b:v 2000k -maxrate 2500k -bufsize 5000k";
     format!(
         "ffmpeg -re -f lavfi -i sine=frequency=1000 \
          -f lavfi -i testsrc=size={width}x{height}:rate=30 \
-            -acodec libopus \
-            -ar 48000 -ac 2 -b:a 48k \
-            -application voip -frame_duration 10 -vbr constrained \
-            -vcodec libvpx -pix_fmt yuv420p \
-            -g 30 -keyint_min 30 \
-            -deadline realtime -speed 4 \
-            -b:v 2000k -maxrate 2500k -bufsize 5000k \
+            {acodec} \
+            {vcodec} \
             {} -f rtsp 'rtsp://{{}}'",
         transport.as_ffmpeg_flag()
     )

@@ -22,10 +22,10 @@ async fn test_livetwo_rtp_vp8() {
     let whip_port: u16 = 5000;
     let whep_port: u16 = 5005;
 
-    let width = 640;
-    let height = 480;
-    let prefix =
-        format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -vcodec libvpx");
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libvpx -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 4 -b:v 2000k -maxrate 2500k -bufsize 5000k";
+    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {vcodec}");
 
     helper_livetwo_rtp(
         ip,
@@ -49,10 +49,10 @@ async fn test_livetwo_rtp_vp8_ipv6() {
     let whip_port: u16 = 5010;
     let whep_port: u16 = 5015;
 
-    let width = 640;
-    let height = 480;
-    let prefix =
-        format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -vcodec libvpx");
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libvpx -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 4 -b:v 2000k -maxrate 2500k -bufsize 5000k";
+    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {vcodec}");
 
     helper_livetwo_rtp(
         ip,
@@ -76,10 +76,12 @@ async fn test_livetwo_rtp_vp9() {
     let whip_port: u16 = 5020;
     let whep_port: u16 = 5025;
 
-    let width = 640;
-    let height = 480;
-    let codec = "-strict experimental -vcodec libvpx-vp9 -pix_fmt yuv420p";
-    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {codec}");
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libvpx-vp9 -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 5 -row-mt 1 -tile-columns 2 -frame-parallel 1 -b:v 1800k -maxrate 2200k -bufsize 4400k";
+    let prefix = format!(
+        "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -strict experimental {vcodec}"
+    );
 
     helper_livetwo_rtp(
         ip,
@@ -103,12 +105,10 @@ async fn test_livetwo_rtp_h264() {
     let whip_port: u16 = 5030;
     let whep_port: u16 = 5035;
 
-    let width = 640;
-    let height = 480;
-    let codec = "-profile:v baseline -level 3.0 -pix_fmt yuv420p -g 30 -keyint_min 30 -b:v 1000k -minrate 1000k -maxrate 1000k -bufsize 1000k -preset ultrafast -tune zerolatency";
-    let prefix = format!(
-        "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -vcodec libx264 {codec}"
-    );
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libx264 -pix_fmt yuv420p -g 30 -keyint_min 30 -crf 23 -preset ultrafast -tune zerolatency -profile:v main -level 4.1";
+    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {vcodec}");
 
     helper_livetwo_rtp(
         ip,
@@ -132,10 +132,10 @@ async fn test_livetwo_rtp_h265() {
     let whip_port: u16 = 5090;
     let whep_port: u16 = 5095;
 
-    let width = 640;
-    let height = 480;
-    let codec = "-vcodec libx265 -preset ultrafast -tune zerolatency -x265-params keyint=30:min-keyint=30:bframes=0:repeat-headers=1 -pix_fmt yuv420p -b:v 1000k -minrate 1000k -maxrate 1000k -bufsize 1000k";
-    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {codec}");
+    let width = 1280;
+    let height = 720;
+    let vcodec = "-vcodec libx265 -pix_fmt yuv420p -g 30 -keyint_min 30 -crf 25 -preset ultrafast -tune zerolatency -profile:v main -level 4.1";
+    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {vcodec}");
 
     helper_livetwo_rtp(
         ip,
@@ -161,8 +161,10 @@ async fn test_livetwo_rtp_vp9_4k() {
 
     let width = 3840;
     let height = 2160;
-    let codec = "-strict experimental -vcodec libvpx-vp9 -pix_fmt yuv420p";
-    let prefix = format!("ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 {codec}");
+    let vcodec = "-vcodec libvpx-vp9 -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 5 -row-mt 1 -tile-columns 2 -frame-parallel 1 -b:v 10m -maxrate 15m -bufsize 30m";
+    let prefix = format!(
+        "ffmpeg -re -f lavfi -i testsrc=size={width}x{height}:rate=30 -strict experimental {vcodec}"
+    );
 
     helper_livetwo_rtp(
         ip,
@@ -186,8 +188,8 @@ async fn test_livetwo_rtp_opus() {
     let whip_port: u16 = 5050;
     let whep_port: u16 = 5055;
 
-    let codec = "-acodec libopus";
-    let prefix = format!("ffmpeg -re -f lavfi -i sine=frequency=1000 {codec}");
+    let acodec = "-acodec libopus -ar 48000 -ac 2 -b:a 48k -application voip -frame_duration 10 -vbr constrained";
+    let prefix = format!("ffmpeg -re -f lavfi -i sine=frequency=1000 {acodec}");
 
     helper_livetwo_rtp(
         ip,
@@ -211,8 +213,8 @@ async fn test_livetwo_rtp_g722() {
     let whip_port: u16 = 5060;
     let whep_port: u16 = 5065;
 
-    let codec = "-acodec g722";
-    let prefix = format!("ffmpeg -re -f lavfi -i sine=frequency=1000 {codec}");
+    let acodec = "-acodec g722";
+    let prefix = format!("ffmpeg -re -f lavfi -i sine=frequency=1000 {acodec}");
 
     helper_livetwo_rtp(
         ip,
@@ -236,11 +238,13 @@ async fn test_livetwo_rtp_vp8_opus() {
     let whip_port: u16 = 5070;
     let whep_port: u16 = 5075;
 
-    let width = 640;
-    let height = 480;
+    let width = 1280;
+    let height = 720;
 
+    let acodec = "-acodec libopus -ar 48000 -ac 2 -b:a 48k -application voip -frame_duration 10 -vbr constrained";
+    let vcodec = "-vcodec libvpx -pix_fmt yuv420p -g 30 -keyint_min 30 -deadline realtime -speed 4 -b:v 2000k -maxrate 2500k -bufsize 5000k";
     let prefix = format!(
-        "ffmpeg -re -f lavfi -i sine=frequency=1000 -f lavfi -i testsrc=size={width}x{height}:rate=30 -acodec libopus -vcodec libvpx -an"
+        "ffmpeg -re -f lavfi -i sine=frequency=1000 -f lavfi -i testsrc=size={width}x{height}:rate=30 {acodec} {vcodec} -an"
     );
 
     helper_livetwo_rtp(
@@ -265,12 +269,13 @@ async fn test_livetwo_rtp_h264_g722() {
     let whip_port: u16 = 5080;
     let whep_port: u16 = 5085;
 
-    let width = 640;
-    let height = 480;
+    let width = 1280;
+    let height = 720;
 
-    let vcodec = "-profile:v baseline -level 3.0 -pix_fmt yuv420p -g 30 -keyint_min 30 -b:v 1000k -minrate 1000k -maxrate 1000k -bufsize 1000k -preset ultrafast -tune zerolatency";
+    let acodec = "-acodec g722";
+    let vcodec = "-vcodec libx264 -pix_fmt yuv420p -g 30 -keyint_min 30 -crf 23 -preset ultrafast -tune zerolatency -profile:v main -level 4.1";
     let prefix = format!(
-        "ffmpeg -re -f lavfi -i sine=frequency=1000 -f lavfi -i testsrc=size={width}x{height}:rate=30 -acodec g722 -vcodec libx264 {vcodec} -an",
+        "ffmpeg -re -f lavfi -i sine=frequency=1000 -f lavfi -i testsrc=size={width}x{height}:rate=30 {acodec} {vcodec} -an",
     );
 
     helper_livetwo_rtp(
@@ -427,7 +432,7 @@ async fn helper_livetwo_rtp(
 
     assert!(result.is_some());
 
-    // TODO: Need wait SDP exists
+    // Need wait SDP exists
     let mut tmp_path_ok = false;
     for _ in 0..100 {
         if std::path::Path::new(&tmp_path).exists() {
@@ -437,9 +442,6 @@ async fn helper_livetwo_rtp(
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
     assert!(tmp_path_ok, "{tmp_path} is not exists");
-
-    // TODO: Need wait SDP
-    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
     let output = Command::new("ffprobe")
         .args(vec![

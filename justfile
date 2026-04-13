@@ -12,11 +12,13 @@ irtp := "5002"
 ortp := "5006"
 
 asrc := "-f lavfi -i sine=frequency=1000"
-vsrc := "-f lavfi -i testsrc=size=640x480:rate=30"
+vsrc := "-f lavfi -i testsrc=size=1280x720:rate=30"
 
-h264 := "libx264 -preset ultrafast -tune zerolatency -profile:v baseline -level 3.0 -pix_fmt yuv420p -g 30 -keyint_min 30 -b:v 1000k -minrate 1000k -maxrate 1000k -bufsize 1000k"
-h265 := "libx265 -preset ultrafast -tune zerolatency -x265-params keyint=30:min-keyint=30:bframes=0:repeat-headers=1 -pix_fmt yuv420p -b:v 1000k -minrate 1000k -maxrate 1000k -bufsize 1000k"
-vp9  := "libvpx-vp9 -pix_fmt yuv420p"
+h264 := "libx264 -pix_fmt yuv420p -g 60 -keyint_min 60 -crf 23 -preset ultrafast -tune zerolatency -profile:v main -level 4.1"
+h265 := "libx265 -pix_fmt yuv420p -g 60 -keyint_min 60 -crf 25 -preset ultrafast -tune zerolatency -profile:v main -level 4.1"
+vp8  := "libvpx -pix_fmt yuv420p -g 60 -keyint_min 60 -deadline realtime -speed 4 -b:v 2000k -maxrate 2500k -bufsize 5000k"
+vp9  := "libvpx-vp9 -pix_fmt yuv420p -g 60 -keyint_min 60 -deadline realtime -speed 5 -row-mt 1 -tile-columns 2 -frame-parallel 1 -b:v 1800k -maxrate 2200k -bufsize 4400k"
+opus := "libopus -ar 48000 -ac 2 -b:a 48k -application voip -frame_duration 10 -vbr constrained"
 
 gst_hd := "video/x-raw,format=I420,width=1280,height=720,framerate=30/1"
 
@@ -263,7 +265,12 @@ ffmpeg-rtp-h265:
 [group('simple-rtp')]
 ffmpeg-rtp-vp8:
     cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
-        "ffmpeg -re {{vsrc}} -vcodec libvpx -f rtp rtp://{{host}}:5002 -sdp_file {{isdp}}"
+        "ffmpeg -re {{vsrc}} -vcodec {{vp8}} -f rtp rtp://{{host}}:5002 -sdp_file {{isdp}}"
+
+[group('simple-rtp')]
+ffmpeg-rtp-vp9:
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
+        "ffmpeg -re {{vsrc}} -strict experimental -vcodec {{vp9}} -f rtp rtp://{{host}}:5002 -sdp_file {{isdp}}"
 
 # 4K (3840×2160)
 [group('simple-rtp')]
@@ -274,7 +281,7 @@ ffmpeg-rtp-4k:
 [group('simple-rtp')]
 ffmpeg-rtp-opus:
     cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
-        "ffmpeg -re {{asrc}} -acodec libopus -f rtp rtp://{{host}}:5002 -sdp_file {{isdp}}"
+        "ffmpeg -re {{asrc}} -acodec {{opus}} -f rtp rtp://{{host}}:5002 -sdp_file {{isdp}}"
 
 [group('simple-rtp')]
 ffmpeg-rtp-g722:
@@ -284,7 +291,7 @@ ffmpeg-rtp-g722:
 [group('simple-rtp')]
 ffmpeg-rtp-vp8-opus:
     cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
-        "ffmpeg -re {{asrc}} {{vsrc}} -acodec libopus -vn -f rtp rtp://{{host}}:5002 -vcodec libvpx -an -f rtp rtp://{{host}}:5004 -sdp_file {{isdp}}"
+        "ffmpeg -re {{asrc}} {{vsrc}} -acodec {{opus}} -vn -f rtp rtp://{{host}}:5002 -vcodec libvpx -an -f rtp rtp://{{host}}:5004 -sdp_file {{isdp}}"
 
 [group('simple-rtp')]
 ffplay-rtp:
