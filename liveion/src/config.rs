@@ -2,6 +2,7 @@ use std::{env, net::SocketAddr, str::FromStr};
 
 use iceserver::{IceServer, default_ice_servers};
 use serde::{Deserialize, Serialize};
+use url::{Host, Url};
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct Config {
@@ -135,13 +136,13 @@ impl ChannelStream {
     /// Parse the URL into (listen_host, listen_port, target_host, target_port).
     /// Supported format: udp://<listen_host>:<listen_port>?host=<target_host>&port=<target_port>
     pub fn parse(&self) -> Option<(String, u16, String, u16)> {
-        let url = url::Url::parse(&self.url).ok()?;
+        let url = Url::parse(&self.url).ok()?;
         if url.scheme() != "udp" {
             return None;
         }
         // url::Host formats IPv4 as "1.2.3.4", IPv6 as "[::1]", Domain as "example.com"
         let listen_host = match url.host()? {
-            url::Host::Ipv6(addr) => format!("[{}]", addr),
+            Host::Ipv6(addr) => format!("[{}]", addr),
             host => host.to_string(),
         };
         let listen_port = url.port()?;
@@ -167,7 +168,6 @@ impl ChannelStream {
         Some((listen_host, listen_port, target_host, target_port))
     }
 }
-
 
 #[cfg(test)]
 mod tests {

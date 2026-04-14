@@ -474,8 +474,7 @@ impl PeerForwardInternal {
         if let Some(stream_cfg) = self.channel.streams.get(&self.stream).cloned() {
             let dc_rx = self.data_channel_forward.subscribe.subscribe();
             let dc_tx = self.data_channel_forward.publish.clone();
-            super::channel::spawn_channel(self.stream.clone(), dc_rx, dc_tx, stream_cfg)
-                .await?;
+            super::channel::spawn_channel(self.stream.clone(), dc_rx, dc_tx, stream_cfg).await?;
         }
         Self::data_channel_forward(dc, sender, receiver).await;
         Ok(())

@@ -48,10 +48,7 @@ pub async fn spawn_channel(
 
     let socket = match UdpSocket::bind(&listen).await {
         Ok(s) => {
-            info!(
-                "channel [{}]: listen={} target={}",
-                stream, listen, target
-            );
+            info!("channel [{}]: listen={} target={}", stream, listen, target);
             s
         }
         Err(e) => {

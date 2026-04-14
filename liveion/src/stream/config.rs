@@ -1,4 +1,4 @@
-use crate::config::{Config, Channel};
+use crate::config::{Channel, Config};
 
 use webrtc::ice_transport::ice_server::RTCIceServer;
 
