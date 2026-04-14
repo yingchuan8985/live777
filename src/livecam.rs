@@ -1,20 +1,20 @@
-use clap::{Parser, Subcommand};
+use std::path::Path;
 use std::sync::{Arc, RwLock};
+
+use clap::{Parser, Subcommand};
 use tracing::{debug, info, warn};
 
 mod log;
 mod utils;
-
-use livecam::config::Config;
 
 #[derive(Parser)]
 #[command(name = "livecam", version)]
 struct Args {
     #[command(subcommand)]
     command: Option<Commands>,
-
-    #[arg(short, long)]
-    config: Option<String>,
+    /// Set config file path
+    #[arg(short, long, default_value_t = format!("{}.toml", "livecam"))]
+    config: String,
 }
 
 #[derive(Subcommand)]
@@ -38,7 +38,14 @@ async fn main() {
         Some(Commands::Serve) | None => {}
     }
 
-    let mut cfg: Config = livecam::utils::load("livecam", args.config);
+    let path = Path::new(&args.config);
+    let mut cfg: livecam::config::Config = if path.try_exists().unwrap() {
+        toml::from_str(std::fs::read_to_string(path).unwrap().as_str()).unwrap()
+    } else {
+        eprintln!("=== No any config file, use default config ===");
+        Default::default()
+    };
+
     cfg.validate().unwrap();
 
     log::set(format!(

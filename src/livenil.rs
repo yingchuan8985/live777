@@ -1,10 +1,12 @@
+use std::path::Path;
+
+use anyhow::Result;
 use clap::Parser;
+use tokio::net::TcpListener;
 use tracing::{debug, info, warn};
 
 mod log;
 mod utils;
-
-use tokio::net::TcpListener;
 
 const NAME: &str = "liveman";
 
@@ -12,8 +14,8 @@ const NAME: &str = "liveman";
 #[command(name = "livenil", version)]
 struct Args {
     /// Set config file path
-    #[arg(short, long)]
-    config: Option<String>,
+    #[arg(short, long, default_value_t = format!("livenil"))]
+    config: String,
 }
 
 pub fn parse(name: &str) -> (&str, &str, &str) {
@@ -25,12 +27,18 @@ pub fn parse(name: &str) -> (&str, &str, &str) {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let args = Args::parse();
-    let mut cfg: liveman::config::Config = utils::load(
-        NAME.to_string(),
-        args.config.clone().map(|s| format!("{s}/liveman.toml")),
-    );
+    let config_path = format!("{}/liveman.toml", args.config);
+    let path = Path::new(&config_path);
+
+    let mut cfg: liveman::config::Config = if path.try_exists()? {
+        toml::from_str(std::fs::read_to_string(path)?.as_str())?
+    } else {
+        eprintln!("=== No any config file, use default config ===");
+        Default::default()
+    };
+
     cfg.validate().unwrap();
 
     log::set(format!(
@@ -40,7 +48,7 @@ async fn main() {
 
     debug!("config : {:?}", cfg);
 
-    let mut dir_entries = tokio::fs::read_dir(args.config.unwrap()).await.unwrap();
+    let mut dir_entries = tokio::fs::read_dir(args.config).await.unwrap();
     let mut results = Vec::new();
     while let Some(entry) = dir_entries.next_entry().await.unwrap() {
         warn!("Entry: {:?}", entry.path());
@@ -51,10 +59,9 @@ async fn main() {
         }
         let alias = alias.to_string();
 
-        let cfg: liveion::config::Config = utils::load(
-            "live777".to_string(),
-            entry.path().to_str().map(|s| s.to_string()),
-        );
+        let cfg: liveion::config::Config =
+            toml::from_str(std::fs::read_to_string(entry.path())?.as_str())?;
+
         cfg.validate().unwrap();
         debug!("config : {:?}", cfg);
         let listener = TcpListener::bind(&cfg.http.listen).await.unwrap();
@@ -78,5 +85,7 @@ async fn main() {
     let listener = TcpListener::bind(cfg.http.listen).await.unwrap();
 
     liveman::serve(cfg, listener, utils::shutdown_signal()).await;
-    info!("Server shutdown");
+    info!("Server graceful shutdown completed");
+
+    Ok(())
 }

@@ -15,7 +15,7 @@ urls = [
 [stream]
 
 # Need enabled `--features=source`
-[[stream.sources]]
+# [[stream.sources]]
 # stream_id = "test-source"
 # Need enabled `--features=source-sdp`
 # - SDP file: file:///path/to/file.sdp or /path/to/file.sdp

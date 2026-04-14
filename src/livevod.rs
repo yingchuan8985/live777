@@ -117,7 +117,14 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
-    let cfg: Config = utils::load("livevod".to_string(), None);
+    let path = std::path::Path::new("livevod.toml");
+    let cfg: Config = if path.try_exists().unwrap() {
+        toml::from_str(std::fs::read_to_string(path).unwrap().as_str()).unwrap()
+    } else {
+        eprintln!("=== No any config file, use default config ===");
+        Default::default()
+    };
+
     log::set(format!("livevod={}", cfg.log.level));
     warn!("set log level : {}", cfg.log.level);
     debug!("config : {:?}", cfg);
