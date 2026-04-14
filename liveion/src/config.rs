@@ -116,10 +116,10 @@ impl Default for Log {
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct Channel {
     /// Per-stream channel configuration, keyed by stream name.
-    /// URL format: udp://<listen_addr>:<listen_port>?host=<target_host>&port=<target_port>
+    /// URL format: udp://<listen_host>:<listen_port>?host=<target_host>&port=<target_port>
     /// Example:
     ///   [channel.streams.camera]
-    ///   url = "udp://127.0.0.1:7774?host=127.0.0.1&port=1234"
+    ///   url = "udp://0.0.0.0:7774?host=127.0.0.1&port=1234"
     #[serde(default)]
     pub streams: std::collections::HashMap<String, ChannelStream>,
 }
@@ -127,7 +127,7 @@ pub struct Channel {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ChannelStream {
     /// Channel URL, currently supports UDP:
-    /// udp://<listen_addr>:<listen_port>?host=<target_host>&port=<target_port>
+    /// udp://<listen_host>:<listen_port>?host=<target_host>&port=<target_port>
     pub url: String,
 }
 

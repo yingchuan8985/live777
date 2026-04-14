@@ -1,9 +1,9 @@
 /// DataChannel <-> UDP bidirectional forwarding
 ///
 /// Each stream maps to one independent UDP endpoint configured via URL:
-///   udp://<listen_addr>:<listen_port>?host=<target_host>&port=<target_port>
+///   udp://<listen_host>:<listen_port>?host=<target_host>&port=<target_port>
 ///
-/// - listen_addr:listen_port  -- liveion binds here to receive replies from downstream
+/// - listen_host:listen_port  -- liveion binds here to receive replies from downstream
 /// - target_host:target_port  -- liveion sends DataChannel messages to this address
 ///
 /// Configuration example (conf/live777.toml):
@@ -19,46 +19,52 @@ use tracing::{debug, info, warn};
 use crate::config::ChannelStream;
 
 /// Buffer size for incoming UDP packets.
-/// Control messages (e.g. PTZ commands) are typically small JSON payloads,
-/// well within 1KB. Using a fixed 1KB buffer avoids unnecessary memory usage.
+/// - WebRTC DataChannel SCTP max: 1024 * 64 = 65536 bytes
+/// - RFC 8831 WebRTC DataChannel max: < 1024 * 16 = 16384 bytes
+/// - IP UDP MTU: 1500 bytes
+/// - Recommended single payload: < 1200 bytes
+///
+/// Control messages (e.g. PTZ commands) are well within this limit.
 const UDP_BUF_SIZE: usize = 1024;
 
 /// Spawn bidirectional forwarding tasks.
-/// If `stream_cfg` is None or the URL is invalid, this is a no-op.
 pub async fn spawn_channel(
     stream: String,
     mut dc_rx: broadcast::Receiver<Vec<u8>>,
     dc_tx: broadcast::Sender<Vec<u8>>,
-    stream_cfg: Option<ChannelStream>,
+    stream_cfg: ChannelStream,
 ) -> anyhow::Result<()> {
-    let cfg = match stream_cfg {
-        Some(c) => c,
-        None => {
-            debug!("channel [{}]: no config, skipping", stream);
-            return Ok(());
-        }
-    };
-
-    let (listen_host, listen_port, target_host, target_port) = match cfg.parse() {
+    let (listen_host, listen_port, target_host, target_port) = match stream_cfg.parse() {
         Some(v) => v,
         None => {
-            warn!("channel [{}]: invalid url: {}", stream, cfg.url);
+            warn!("channel [{}]: invalid url: {}", stream, stream_cfg.url);
             return Ok(());
         }
     };
 
     // Format socket addresses using url::Host to correctly handle IPv6 brackets
     let target = format!("{}:{}", target_host, target_port);
-    let bind_addr = format!("{}:{}", listen_host, listen_port);
+    let listen = format!("{}:{}", listen_host, listen_port);
 
-    let socket = match UdpSocket::bind(&bind_addr).await {
+    let socket = match UdpSocket::bind(&listen).await {
         Ok(s) => {
-            info!("channel [{}]: listen={} target={}", stream, bind_addr, target);
+            info!(
+                "channel [{}]: listen={} target={}",
+                stream, listen, target
+            );
             s
         }
         Err(e) => {
-            warn!("channel [{}]: bind socket failed on {}: {}", stream, bind_addr, e);
-            return Err(anyhow::anyhow!("channel [{}]: bind {} failed: {}", stream, bind_addr, e));
+            warn!(
+                "channel [{}]: bind socket failed on {}: {}",
+                stream, listen, e
+            );
+            return Err(anyhow::anyhow!(
+                "channel [{}]: bind {} failed: {}",
+                stream,
+                listen,
+                e
+            ));
         }
     };
 
