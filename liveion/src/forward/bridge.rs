@@ -2,6 +2,7 @@ use super::PeerForward;
 use crate::forward::rtcp::RtcpMessage;
 use crate::stream::source::{MediaPacket, StateChangeEvent};
 use anyhow::Result;
+use anyhow::anyhow;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast;
@@ -9,16 +10,68 @@ use tracing::{debug, error, info, trace, warn};
 use webrtc::util::Marshal;
 
 const LOG_PACKET_INTERVAL: u64 = 100;
-const CHANNEL_VIDEO_RTP: u8 = 0;
-const CHANNEL_VIDEO_RTCP: u8 = 1;
-const CHANNEL_AUDIO_RTP: u8 = 2;
-const CHANNEL_AUDIO_RTCP: u8 = 3;
 
+#[derive(Debug, Clone, Copy)]
+struct ChannelMapping {
+    video_rtp: Option<u8>,
+    video_rtcp: Option<u8>,
+    audio_rtp: Option<u8>,
+    audio_rtcp: Option<u8>,
+}
+
+impl ChannelMapping {
+    fn new(has_video: bool, has_audio: bool) -> Self {
+        match (has_video, has_audio) {
+            (true, false) => Self {
+                video_rtp: Some(0),
+                video_rtcp: Some(1),
+                audio_rtp: None,
+                audio_rtcp: None,
+            },
+            (false, true) => Self {
+                video_rtp: None,
+                video_rtcp: None,
+                audio_rtp: Some(0),
+                audio_rtcp: Some(1),
+            },
+            (true, true) => Self {
+                video_rtp: Some(0),
+                video_rtcp: Some(1),
+                audio_rtp: Some(2),
+                audio_rtcp: Some(3),
+            },
+            (false, false) => Self {
+                video_rtp: None,
+                video_rtcp: None,
+                audio_rtp: None,
+                audio_rtcp: None,
+            },
+        }
+    }
+
+    fn is_video_rtp(&self, channel: u8) -> bool {
+        self.video_rtp == Some(channel)
+    }
+
+    fn is_video_rtcp(&self, channel: u8) -> bool {
+        self.video_rtcp == Some(channel)
+    }
+
+    fn is_audio_rtp(&self, channel: u8) -> bool {
+        self.audio_rtp == Some(channel)
+    }
+
+    fn is_audio_rtcp(&self, channel: u8) -> bool {
+        self.audio_rtcp == Some(channel)
+    }
+}
 pub struct SourceBridge {
     source_id: String,
     forward: Arc<PeerForward>,
     tasks: Arc<tokio::sync::Mutex<Vec<tokio::task::JoinHandle<()>>>>,
     shutdown_tx: Option<tokio::sync::broadcast::Sender<()>>,
+
+    channel_mapping: ChannelMapping,
 
     #[cfg(feature = "source")]
     rtcp_to_source_tx: Option<tokio::sync::mpsc::UnboundedSender<Vec<u8>>>,
@@ -27,12 +80,20 @@ pub struct SourceBridge {
 }
 
 impl SourceBridge {
-    pub fn new(source_id: String, forward: Arc<PeerForward>) -> Self {
+    pub fn new(
+        source_id: String,
+        forward: Arc<PeerForward>,
+        has_video: bool,
+        has_audio: bool,
+    ) -> Self {
+        let channel_mapping = ChannelMapping::new(has_video, has_audio);
+
         Self {
             source_id,
             forward,
             tasks: Arc::new(tokio::sync::Mutex::new(Vec::new())),
             shutdown_tx: None,
+            channel_mapping,
             #[cfg(feature = "source")]
             rtcp_to_source_tx: None,
             #[cfg(feature = "source")]
@@ -73,9 +134,13 @@ impl SourceBridge {
         let forward_clone = self.forward.clone();
         let source_id_clone = self.source_id.clone();
         let mut shutdown_rx1 = shutdown_tx.subscribe();
+        let channel_mapping = self.channel_mapping;
 
         let rtp_task = tokio::spawn(async move {
-            info!("[{}] RTP bridging task started", source_id_clone);
+            info!(
+                "[{}] RTP bridging task started with mapping: {:?}",
+                source_id_clone, channel_mapping
+            );
             let mut packet_count = 0u64;
             let mut video_count = 0u64;
             let mut audio_count = 0u64;
@@ -96,41 +161,36 @@ impl SourceBridge {
 
                                 let inject_result = match packet {
                                     MediaPacket::Rtp { channel, data, .. } => {
-                                        match channel {
-                                            CHANNEL_VIDEO_RTP => {
-                                                video_count += 1;
-                                                if video_count % LOG_PACKET_INTERVAL == 1 {
-                                                    debug!(
-                                                        "[{}] Forwarding video packet #{}, size: {}",
-                                                        source_id_clone, video_count, data.len()
-                                                    );
-                                                }
-                                                forward_clone.inject_video_rtp(&data).await
-                                            }
-                                            CHANNEL_AUDIO_RTP => {
-                                                audio_count += 1;
-                                                if audio_count % LOG_PACKET_INTERVAL == 1 {
-                                                    debug!(
-                                                        "[{}] Forwarding audio packet #{}, size: {}",
-                                                        source_id_clone, audio_count, data.len()
-                                                    );
-                                                }
-                                                forward_clone.inject_audio_rtp(&data).await
-                                            }
-                                            CHANNEL_VIDEO_RTCP | CHANNEL_AUDIO_RTCP => {
-                                                trace!(
-                                                    "[{}] Received RTCP packet on channel {}",
-                                                    source_id_clone, channel
+                                        if channel_mapping.is_video_rtp(channel) {
+                                            video_count += 1;
+                                            if video_count % LOG_PACKET_INTERVAL == 1 {
+                                                debug!(
+                                                    "[{}] Forwarding video packet #{}, size: {}",
+                                                    source_id_clone, video_count, data.len()
                                                 );
-                                                Ok(())
                                             }
-                                            _ => {
-                                                warn!(
-                                                    "[{}] Unknown channel: {}",
-                                                    source_id_clone, channel
+                                            forward_clone.inject_video_rtp(&data).await.map_err(|e| anyhow!("{:?}", e))
+                                        } else if channel_mapping.is_audio_rtp(channel) {
+                                            audio_count += 1;
+                                            if audio_count % LOG_PACKET_INTERVAL == 1 {
+                                                debug!(
+                                                    "[{}] Forwarding audio packet #{}, size: {}",
+                                                    source_id_clone, audio_count, data.len()
                                                 );
-                                                Ok(())
                                             }
+                                            forward_clone.inject_audio_rtp(&data).await.map_err(|e| anyhow!("{:?}", e))
+                                        } else if channel_mapping.is_video_rtcp(channel) || channel_mapping.is_audio_rtcp(channel) {
+                                            trace!(
+                                                "[{}] Received RTCP packet on channel {}",
+                                                source_id_clone, channel
+                                            );
+                                            Ok(())
+                                        } else {
+                                            warn!(
+                                                "[{}] Unknown channel: {}",
+                                                source_id_clone, channel
+                                            );
+                                            Ok(())
                                         }
                                     }
                                 };
