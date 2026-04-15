@@ -128,6 +128,9 @@ impl SourceManager {
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
 
+        let has_video = video_codec.is_some();
+        let has_audio = audio_codec.is_some();
+
         if let Some(codec) = video_codec {
             info!(
                 "Adding video track for {}: {}",
@@ -190,7 +193,7 @@ impl SourceManager {
 
         drop(source_guard);
 
-        let mut bridge = SourceBridge::new(stream_id.to_string(), forward);
+        let mut bridge = SourceBridge::new(stream_id.to_string(), forward, has_video, has_audio);
 
         if let Some(rtcp_tx) = rtcp_sender {
             bridge.set_rtcp_sender(rtcp_tx);
