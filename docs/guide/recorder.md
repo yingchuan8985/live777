@@ -4,9 +4,9 @@ The Recorder in liveion is an optional feature that automatically records live s
 
 ## Supported Codecs {#codec}
 
-| container           | video codecs | audio codecs |
-| ------------------- | ------------| ------------ |
-| `Fragmented MP4`    | `H264`, `VP9`| `Opus`       |
+| container        | video codecs         | audio codecs |
+| ---------------- | -------------------- | ------------ |
+| `Fragmented MP4` | `H264`, `H265`, `VP9`| `Opus`       |
 
 **Recorder does not support the `VP8` codec because `VP8` requires a `WebM` container.**
 

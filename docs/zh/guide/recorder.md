@@ -4,9 +4,9 @@ liveion 的 Recorder 是一个可选功能，用于将实时流自动录制为 M
 
 ## 目前支持的编码 {#codec}
 
-| container  | video codecs                | audio codecs   |
-| -------- | --------------------------- | -------------- |
-| `Fragmented MP4`    | `H264`, `VP9`| `Opus`       |
+| container        | video codecs         | audio codecs |
+| ---------------- | -------------------- | ------------ |
+| `Fragmented MP4` | `H264`, `H265`, `VP9`| `Opus`       |
 
 **Recorder 暂不支持 `VP8` 编码，因为 `VP8` 需要 `WebM` 容器。**
 
