@@ -8,12 +8,12 @@ authors.workspace = true
 
 [dev-dependencies]
 portpicker = "0.1.1"
-rumqttd = "0.19.0"
+rumqttd = { version = "0.20.0", default-features = false }
 tokio-test = "0.4.4"
 reqwest = { workspace = true, features = ["socks"] }
 
 [dependencies]
-rumqttd = { version = "0.19.0", optional = true }
+rumqttd = { version = "0.20.0", default-features = false, optional = true }
 
 anyhow = { workspace = true }
 url = { workspace = true }
@@ -23,7 +23,7 @@ tokio = { workspace = true, features = ["rt-multi-thread", "sync"] }
 lru_time_cache = "0.11.11"
 kcp = "0.6"
 rand = "0.10"
-rumqttc = { version = "0.24.0", features = ["url"] }
+rumqttc = { version = "0.25.0", default-features = false, features = ["url"] }
 socks5-server = "0.10.1"
 
 [features]
