@@ -161,28 +161,52 @@ impl RePayloadCodec {
 
         debug!("H.265 NAL type: {}", nal_type);
 
-        if nal_type <= 31 {
-            debug!("Converting single NAL to Annex B");
-            let mut result = Vec::with_capacity(4 + data.len());
-            result.extend_from_slice(&START_CODE_4);
-            result.extend_from_slice(data);
-            return result;
-        }
+        match nal_type {
+            0..=31 => {
+                trace!("Single VCL NAL unit");
+                let mut result = Vec::with_capacity(4 + data.len());
+                result.extend_from_slice(&START_CODE_4);
+                result.extend_from_slice(data);
+                result
+            }
 
-        if nal_type == H265_NAL_TYPE_AP && data.len() > 2 {
-            debug!("Converting AP to Annex B");
-            return self.convert_h265_ap_to_annex_b(&data[2..]);
-        }
+            32..=34 => {
+                trace!("Parameter set NAL unit ({})", nal_type);
+                let mut result = Vec::with_capacity(4 + data.len());
+                result.extend_from_slice(&START_CODE_4);
+                result.extend_from_slice(data);
+                result
+            }
 
-        if nal_type == H265_NAL_TYPE_FU {
-            error!("FU should not reach convert_h265_to_annex_b!");
-        }
+            35..=47 => {
+                trace!("Non-VCL NAL unit");
+                let mut result = Vec::with_capacity(4 + data.len());
+                result.extend_from_slice(&START_CODE_4);
+                result.extend_from_slice(data);
+                result
+            }
 
-        warn!("Unknown H.265 NAL type {}, adding start code", nal_type);
-        let mut result = Vec::with_capacity(4 + data.len());
-        result.extend_from_slice(&START_CODE_4);
-        result.extend_from_slice(data);
-        result
+            H265_NAL_TYPE_AP if data.len() > 2 => {
+                debug!("Converting AP to Annex B");
+                self.convert_h265_ap_to_annex_b(&data[2..])
+            }
+
+            H265_NAL_TYPE_FU => {
+                error!("FU should not reach convert_h265_to_annex_b!");
+                Vec::new()
+            }
+
+            _ => {
+                warn!(
+                    "Unknown H.265 NAL type {}, adding start code anyway",
+                    nal_type
+                );
+                let mut result = Vec::with_capacity(4 + data.len());
+                result.extend_from_slice(&START_CODE_4);
+                result.extend_from_slice(data);
+                result
+            }
+        }
     }
 
     fn convert_h265_ap_to_annex_b(&self, data: &[u8]) -> Vec<u8> {
