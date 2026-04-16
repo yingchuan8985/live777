@@ -5,7 +5,10 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/liveman
+DynamicUser=yes
+ExecStart=/usr/bin/liveman --config /etc/live777/liveman.toml
+WorkingDirectory=/var/lib/live777
+StateDirectory=live777
 Restart=on-failure
 RestartSec=5s
 
