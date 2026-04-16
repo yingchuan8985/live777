@@ -22,15 +22,23 @@ For example: Use `ffmpeg -sdp_file` flag
 ### RTP Only video
 
 ```bash
-ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 \
--vcodec libvpx -f rtp 'rtp://127.0.0.1:5003' -sdp_file input.sdp
+ffmpeg -re -f lavfi -i testsrc=size=1280x720:rate=30 \
+-vcodec libx264 -pix_fmt yuv420p \
+-g 60 -keyint_min 60 -crf 23 \
+-preset ultrafast -tune zerolatency \
+-profile:v main -level 4.1 \
+-f rtp 'rtp://127.0.0.1:5002' -sdp_file input.sdp
 ```
 
 ### RTP Only audio
 
 ```bash
 ffmpeg -re -f lavfi -i sine=frequency=1000 \
--acodec libopus -f rtp 'rtp://127.0.0.1:5005' -sdp_file input.sdp
+-acodec libopus \
+-ar 48000 -ac 2 \
+-b:a 48k -application voip \
+-frame_duration 10 -vbr constrained \
+-f rtp 'rtp://127.0.0.1:5004' -sdp_file input.sdp
 ```
 
 ### RTP Audio and Video
@@ -38,7 +46,7 @@ ffmpeg -re -f lavfi -i sine=frequency=1000 \
 ```bash
 ffmpeg -re \
 -f lavfi -i sine=frequency=1000 \
--f lavfi -i testsrc=size=640x480:rate=30 \
+-f lavfi -i testsrc=size=1280x720:rate=30 \
 -acodec libopus -vn -f rtp rtp://127.0.0.1:11111 \
 -vcodec libvpx -an -f rtp rtp://127.0.0.1:11113 -sdp_file input.sdp
 ```
@@ -56,24 +64,16 @@ whipinto -w http://localhost:7777/whip/777
 ### Only video
 
 ```bash
-ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 \
+ffmpeg -re -f lavfi -i testsrc=size=1280x720:rate=30 \
 -vcodec libvpx -f rtsp 'rtsp://127.0.0.1:8554'
 ```
 
-::: danger NOTE:
-**For H264 FFmpeg RTSP client**
-
-Your must use `-x264-params repeat_headers=1`
-:::
-
 ```bash
-ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 \
--vcodec libx264 \
--profile:v baseline -level 3.1 -pix_fmt yuv420p \
--g 15 -keyint_min 15 -b:v 1000k \
--minrate 1000k -maxrate 1000k -bufsize 1000k \
+ffmpeg -re -f lavfi -i testsrc=size=1280x720:rate=30 \
+-vcodec -pix_fmt yuv420p \
+-g 60 -keyint_min 60 -crf 23 \
 -preset ultrafast -tune zerolatency \
--x264-params repeat_headers=1 \
+-profile:v main -level 4.1 \
 -f rtsp rtsp://127.0.0.1:8554
 ```
 
@@ -89,7 +89,7 @@ ffmpeg -re -f lavfi -i sine=frequency=1000 \
 ```bash
 ffmpeg -re \
 -f lavfi -i sine=frequency=1000 \
--f lavfi -i testsrc=size=640x480:rate=30 \
+-f lavfi -i testsrc=size=1280x720:rate=30 \
 -acodec libopus -vcodec libvpx \
 -f rtsp 'rtsp://127.0.0.1:8554'
 ```
@@ -99,7 +99,7 @@ ffmpeg -re \
 ```bash
 ffmpeg -re \
 -f lavfi -i sine=frequency=1000 \
--f lavfi -i testsrc=size=640x480:rate=30 \
+-f lavfi -i testsrc=size=1280x720:rate=30 \
 -acodec libopus -vcodec libvpx \
 -rtsp_transport tcp \
 -f rtsp 'rtsp://127.0.0.1:8554'
