@@ -2,7 +2,6 @@ use std::{env, net::SocketAddr, str::FromStr};
 
 use iceserver::{IceServer, default_ice_servers};
 use serde::{Deserialize, Serialize};
-use url::{Host, Url};
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct Config {
@@ -136,30 +135,32 @@ impl ChannelStream {
     /// Parse the URL into (listen_host, listen_port, target_host, target_port).
     /// Supported format: udp://<listen_host>:<listen_port>?host=<target_host>&port=<target_port>
     pub fn parse(&self) -> Option<(String, u16, String, u16)> {
-        let url = Url::parse(&self.url).ok()?;
-        if url.scheme() != "udp" {
-            return None;
-        }
-        // url::Host formats IPv4 as "1.2.3.4", IPv6 as "[::1]", Domain as "example.com"
-        let listen_host = match url.host()? {
-            Host::Ipv6(addr) => format!("[{}]", addr),
-            host => host.to_string(),
+        // Parse udp://<listen_host>:<listen_port>?host=<target_host>&port=<target_port>
+        let s = self.url.strip_prefix("udp://")?;
+        let (host_port, query) = s.split_once('?')?;
+        // rsplit_once handles IPv6 like [::1]:7774 correctly
+        let (listen_host_raw, listen_port_str) = host_port.rsplit_once(':')?;
+        let listen_port: u16 = listen_port_str.parse().ok()?;
+        // Strip brackets from IPv6 address e.g. [::1] -> ::1, then re-add for socket addr
+        let listen_host_inner = listen_host_raw.trim_matches(|c| c == '[' || c == ']');
+        let listen_host = if listen_host_inner.contains(':') {
+            format!("[{}]", listen_host_inner)
+        } else {
+            listen_host_inner.to_string()
         };
-        let listen_port = url.port()?;
+
         let mut target_host = String::new();
         let mut target_port: u16 = 0;
-        for (key, value) in url.query_pairs() {
-            match key.as_ref() {
-                "host" => {
-                    // Wrap IPv6 addresses in brackets for use as socket address
-                    target_host = if value.parse::<std::net::Ipv6Addr>().is_ok() {
-                        format!("[{}]", value)
-                    } else {
-                        value.into_owned()
-                    };
-                }
-                "port" => target_port = value.parse().ok()?,
-                _ => {}
+        for param in query.split('&') {
+            if let Some(v) = param.strip_prefix("host=") {
+                // Wrap IPv6 addresses in brackets for use as socket address
+                target_host = if v.parse::<std::net::Ipv6Addr>().is_ok() {
+                    format!("[{}]", v)
+                } else {
+                    v.to_string()
+                };
+            } else if let Some(v) = param.strip_prefix("port=") {
+                target_port = v.parse().ok()?;
             }
         }
         if target_host.is_empty() || target_port == 0 {
