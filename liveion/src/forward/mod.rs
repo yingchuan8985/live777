@@ -14,6 +14,7 @@ use webrtc::sdp::SessionDescription;
 
 use libwish::Client;
 
+#[cfg(feature = "source")]
 use crate::config::Channel;
 use crate::forward::internal::PeerForwardInternal;
 use crate::forward::message::{ForwardInfo, Layer};
@@ -29,6 +30,7 @@ use webrtc::util::Unmarshal;
 use self::media::MediaInfo;
 use self::message::{CascadeInfo, ForwardEvent};
 
+#[cfg(feature = "source")]
 pub(crate) mod channel;
 mod internal;
 mod media;
@@ -72,11 +74,21 @@ pub struct AudioTrackInfo {
 }
 
 impl PeerForward {
+    #[cfg(feature = "source")]
     pub fn new(stream: impl ToString, ice_server: Vec<RTCIceServer>, channel: Channel) -> Self {
         PeerForward {
             stream: stream.to_string(),
             publish_lock: Arc::new(Mutex::new(())),
             internal: Arc::new(PeerForwardInternal::new(stream, ice_server, channel)),
+        }
+    }
+
+    #[cfg(not(feature = "source"))]
+    pub fn new(stream: impl ToString, ice_server: Vec<RTCIceServer>) -> Self {
+        PeerForward {
+            stream: stream.to_string(),
+            publish_lock: Arc::new(Mutex::new(())),
+            internal: Arc::new(PeerForwardInternal::new(stream, ice_server)),
         }
     }
     pub fn subscribe_event(&self) -> broadcast::Receiver<ForwardEvent> {
@@ -139,9 +151,8 @@ impl PeerForward {
             ));
         }
 
-        let peer = self
-            .new_publish_peer(MediaInfo::try_from(offer.unmarshal()?)?)
-            .await?;
+        let media_info = MediaInfo::try_from(offer.unmarshal()?)?;
+        let peer = self.new_publish_peer(media_info).await?;
 
         let description = peer_complete(offer, peer.clone()).await?;
 

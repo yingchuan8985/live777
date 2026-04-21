@@ -26,6 +26,7 @@ pub struct Config {
     #[serde(default)]
     pub webhook: Webhook,
 
+    #[cfg(feature = "source")]
     #[serde(default)]
     pub channel: Channel,
 
@@ -113,6 +114,7 @@ impl Default for Log {
     }
 }
 
+#[cfg(feature = "source")]
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct Channel {
     /// Per-stream channel configuration, keyed by stream name.
@@ -124,6 +126,7 @@ pub struct Channel {
     pub streams: std::collections::HashMap<String, ChannelStream>,
 }
 
+#[cfg(feature = "source")]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ChannelStream {
     /// Channel URL, currently supports UDP:
@@ -131,6 +134,7 @@ pub struct ChannelStream {
     pub url: String,
 }
 
+#[cfg(feature = "source")]
 impl ChannelStream {
     /// Parse the URL into (listen_host, listen_port, target_host, target_port).
     /// Supported format: udp://<listen_host>:<listen_port>?host=<target_host>&port=<target_port>
@@ -170,6 +174,7 @@ impl ChannelStream {
     }
 }
 
+#[cfg(feature = "source")]
 #[cfg(test)]
 mod tests {
     use super::*;
