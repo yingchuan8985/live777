@@ -497,8 +497,10 @@ impl PeerForwardInternal {
         // Messages from the WHIP publisher arrive on the subscribe channel.
         #[cfg(feature = "source")]
         if let Some(stream_cfg) = self.channel.streams.get(&self.stream).cloned() {
-            let dc_rx = self.data_channel_forward.subscribe.subscribe();
-            // UDP -> DC: write to subscribe channel so all WHEP subscribers receive it
+            // UDP acts as a member of the WHIP group:
+            // - dc_rx: receive messages from WHEP group (publish channel)
+            // - dc_tx: send messages to WHEP group (subscribe channel)
+            let dc_rx = self.data_channel_forward.publish.subscribe();
             let dc_tx = self.data_channel_forward.subscribe.clone();
             super::channel::spawn_channel(self.stream.clone(), dc_rx, dc_tx, stream_cfg).await?;
         }
