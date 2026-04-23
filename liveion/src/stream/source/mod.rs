@@ -34,15 +34,12 @@ pub struct StateChangeEvent {
 
 #[derive(Debug, Clone)]
 pub enum MediaPacket {
-    #[allow(dead_code)]
     Rtp { channel: u8, data: Vec<u8> },
 }
 
 #[derive(Debug, Clone)]
 pub struct InternalSourceConfig {
-    #[allow(dead_code)]
     pub stream_id: String,
-    #[allow(dead_code)]
     pub url: String,
 }
 
@@ -54,17 +51,14 @@ impl InternalSourceConfig {
         }
     }
 
-    #[allow(dead_code)]
     pub fn reconnect_enabled(&self) -> bool {
         self.url.starts_with("rtsp://") || self.url.starts_with("rtsps://")
     }
 
-    #[allow(dead_code)]
     pub fn reconnect_interval_ms(&self) -> u64 {
         5000
     }
 
-    #[allow(dead_code)]
     pub fn max_reconnect_attempts(&self) -> u32 {
         0
     }
@@ -108,7 +102,6 @@ pub async fn create_source_from_url(
     url: &str,
     config: &crate::config::SourceConfig,
 ) -> Result<Box<dyn StreamSource>> {
-    #[allow(unused_variables)]
     let internal_config = InternalSourceConfig::from_config(config);
 
     if url.starts_with("rtsp://") || url.starts_with("rtsps://") {
